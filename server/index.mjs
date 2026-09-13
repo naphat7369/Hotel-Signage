@@ -1073,6 +1073,22 @@ async function handler(req, res) {
       file !== web
     )
       fail(403, "Path ไม่ถูกต้อง");
+    if (path === "/Shotel-Player.apk" || path === "/StayScreen-Player.apk" || path.endsWith(".apk")) {
+      const candidates = [
+        file,
+        join(web, "Shotel-Player.apk"),
+        join(web, "StayScreen-Player.apk"),
+        join(root, "Shotel-Player.apk"),
+        join(root, "StayScreen-Player.apk"),
+        join(root, "android/app/build/outputs/apk/debug/app-debug.apk"),
+      ];
+      for (const cand of candidates) {
+        if (existsSync(cand) && statSync(cand).isFile()) {
+          file = cand;
+          break;
+        }
+      }
+    }
     if (!existsSync(file) || !statSync(file).isFile())
       file = join(web, "index.html");
     if (!existsSync(file)) fail(503, "กรุณา build เว็บก่อน");
@@ -1086,7 +1102,13 @@ async function handler(req, res) {
       ".apk": "application/vnd.android.package-archive",
     };
     if (file.endsWith(".apk")) {
-      res.setHeader("Content-Disposition", 'attachment; filename="StayScreen-Player.apk"');
+      const downloadName = path.toLowerCase().includes("stayscreen")
+        ? "StayScreen-Player.apk"
+        : "Shotel-Player.apk";
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${downloadName}"`,
+      );
     }
     return stream(
       res,
@@ -1151,7 +1173,7 @@ server.listen(
   process.env.HOST || "127.0.0.1",
   () =>
     console.log(
-      `StayScreen ${tls ? "https" : "http"}://${process.env.HOST || "127.0.0.1"}:${server.address().port} | Data: ${home}`,
+      `Shotel ${tls ? "https" : "http"}://${process.env.HOST || "127.0.0.1"}:${server.address().port} | Data: ${home}`,
     ),
 );
 process.on("SIGTERM", () =>

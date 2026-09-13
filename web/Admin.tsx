@@ -696,7 +696,7 @@ export default function Admin() {
       <main className="auth">
         <div className="auth-brand">
           <span className="logo">S</span>
-          <h1>StayScreen</h1>
+          <h1>Shotel</h1>
           <p>Hotel Digital Signage</p>
         </div>
         <form
@@ -780,7 +780,7 @@ export default function Admin() {
         <div className="brand">
           <span className="logo">S</span>
           <div>
-            <strong>StayScreen</strong>
+            <strong>Shotel</strong>
             <small style={{ letterSpacing: "0.08em", textTransform: "uppercase" }}>Hotel Signage</small>
           </div>
         </div>
@@ -842,7 +842,7 @@ export default function Admin() {
         <div className="page">
           <div className="heading">
             <div>
-              <span className="eyebrow">STAYSCREEN CONSOLE</span>
+              <span className="eyebrow">SHOTEL CONSOLE</span>
               <h1>{tab === "displays" ? "จัดการจอแสดงผล" : nav.find((n) => n[0] === tab)?.[1]}</h1>
               <p>
                 {tab === "displays"

@@ -433,7 +433,7 @@ export default function Player() {
     return (
       <main className="player-setup">
         <Monitor size={50} />
-        <h1>StayScreen Player</h1>
+        <h1>Shotel Player</h1>
         <p>{status}</p>
         {error && (
           <p role="alert" className="error">
@@ -514,7 +514,7 @@ export default function Player() {
       ) : (
         <div className="player-wait">
           <Monitor size={40} />
-          <h2>{manifest?.name || "StayScreen"}</h2>
+          <h2>{manifest?.name || "Shotel"}</h2>
           <p>{status}</p>
           {error && <p>{error}</p>}
           <small>แตะสองครั้งเพื่อเปิดเครื่องมือ</small>

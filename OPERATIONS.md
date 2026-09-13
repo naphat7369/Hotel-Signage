@@ -1,4 +1,4 @@
-# StayScreen — คู่มือใช้งานบนเครื่องของคุณ
+# Shotel — คู่มือใช้งานบนเครื่องของคุณ
 
 ## เริ่มต้น
 
@@ -39,7 +39,7 @@ npm start
 
 APK ที่ build แล้วอยู่ `android/app/build/outputs/apk/debug/app-debug.apk` เป็น build สำหรับติดตั้งทดสอบ ห้ามถือเป็นการรับรองกล่องทุกยี่ห้อ เปิดแอป กรอก URL เดียวกับ CMS สร้างรหัสจับคู่แล้วลงทะเบียนตามขั้นตอนข้างต้น ใช้ HTTPS ที่ระบบ Android เชื่อถือ แนะนำทดสอบการเล่นรูป/วิดีโอและรีบูตบนกล่องที่จะติดตั้งจริง
 
-หากกล่องรองรับการเลือก Home app ให้เลือก StayScreen เป็น Home เพื่อเปิดหลังบูตโดยระบบ ไม่บังคับ Device Owner หรือ factory reset ให้ผู้ใช้ แอปยังไม่จัดการ OS updates, remote APK updates, HDMI, หรือการเปิด TV อัตโนมัติ
+หากกล่องรองรับการเลือก Home app ให้เลือก Shotel เป็น Home เพื่อเปิดหลังบูตโดยระบบ ไม่บังคับ Device Owner หรือ factory reset ให้ผู้ใช้ แอปยังไม่จัดการ OS updates, remote APK updates, HDMI, หรือการเปิด TV อัตโนมัติ
 
 ## Offline, Screenshot และรายงาน
 

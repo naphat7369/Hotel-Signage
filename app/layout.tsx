@@ -3,7 +3,7 @@ import "./globals.css";
 import "./manage.css";
 
 export const metadata: Metadata = {
-  title: "StayScreen — Hotel Signage",
+  title: "Shotel — Hotel Signage",
   description: "ระบบจัดการ Digital Signage สำหรับโรงแรมหลายสาขา",
   other: {
     "codex-preview": "development",
