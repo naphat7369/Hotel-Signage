@@ -125,6 +125,47 @@ function match(p, hash) {
   const [salt, digest] = hash.split(":");
   return timingSafeEqual(scryptSync(p, salt, 64), Buffer.from(digest, "hex"));
 }
+function seedAdminIfEmpty() {
+  const userCount = one("SELECT count(*) as count FROM users")?.count || 0;
+  if (userCount === 0) {
+    const adminEmail = (process.env.ADMIN_EMAIL || "admin@shotel.com").toLowerCase().trim();
+    const adminPass = process.env.ADMIN_PASSWORD || "admin12345678";
+    const adminName = process.env.ADMIN_NAME || "Shotel Administrator";
+    const orgName = process.env.ORG_NAME || "Shotel Hotel";
+    const branchName = process.env.BRANCH_NAME || "สาขาหลัก (Main Branch)";
+
+    const orgId = randomUUID();
+    const branchId = randomUUID();
+    const userId = randomUUID();
+
+    tx(() => {
+      put("organizations", orgId, "", { name: orgName, quota: 10 * 1024 ** 3 }, orgId);
+      put("branches", orgId, branchId, { name: branchName, timezone: "Asia/Bangkok" }, branchId);
+      run(
+        "INSERT INTO users VALUES(?,?,?,?,?,?,?,?)",
+        userId,
+        adminEmail,
+        adminName,
+        "platform",
+        orgId,
+        "",
+        password(adminPass),
+        now(),
+      );
+    });
+    console.log(`[Shotel Admin] Seeded default administrator: ${adminEmail} (password: ${adminPass})`);
+  }
+  if (process.env.RESET_ADMIN_PASSWORD && process.env.ADMIN_EMAIL) {
+    const targetEmail = process.env.ADMIN_EMAIL.toLowerCase().trim();
+    const newPass = process.env.RESET_ADMIN_PASSWORD;
+    const existing = one("SELECT id FROM users WHERE email=?", targetEmail);
+    if (existing) {
+      run("UPDATE users SET hash=? WHERE id=?", password(newPass), existing.id);
+      console.log(`[Shotel Admin] Updated password for ${targetEmail} from RESET_ADMIN_PASSWORD`);
+    }
+  }
+}
+seedAdminIfEmpty();
 function user(req) {
   const sid = (req.headers.cookie || "")
     .split(";")
@@ -342,17 +383,20 @@ async function handler(req, res) {
     if (path === "/api/bootstrap" && req.method === "GET")
       return send(res, 200, {
         needsSetup: !one("SELECT id FROM users LIMIT 1"),
-        local: ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(
-          req.socket.remoteAddress,
-        ),
+        local:
+          process.env.ALLOW_REMOTE_SETUP === "true" ||
+          ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(
+            req.socket.remoteAddress,
+          ),
       });
     if (path === "/api/setup" && req.method === "POST") {
       if (
+        process.env.ALLOW_REMOTE_SETUP !== "true" &&
         !["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(
           req.socket.remoteAddress,
         )
       )
-        fail(403, "สร้างผู้ดูแลครั้งแรกจาก localhost เท่านั้น");
+        fail(403, "สร้างผู้ดูแลครั้งแรกจาก localhost เท่านั้น (หรือตั้งค่า ALLOW_REMOTE_SETUP=true)");
       const b = await json(req);
       const hash = password(b.password);
       const email = str(b.email).toLowerCase();
@@ -1168,13 +1212,19 @@ const server = tls
   ? https.createServer(tls, handler)
   : http.createServer(handler);
 server.requestTimeout = 600000;
+const bindHost = process.env.HOST || "0.0.0.0";
 server.listen(
   Number(process.env.PORT || 8787),
-  process.env.HOST || "127.0.0.1",
-  () =>
+  bindHost,
+  () => {
+    const admin = one("SELECT email FROM users LIMIT 1");
     console.log(
-      `Shotel ${tls ? "https" : "http"}://${process.env.HOST || "127.0.0.1"}:${server.address().port} | Data: ${home}`,
-    ),
+      `Shotel ${tls ? "https" : "http"}://${bindHost}:${server.address().port} | Data: ${home}`,
+    );
+    if (admin) {
+      console.log(`Shotel Admin ready: ${admin.email}`);
+    }
+  },
 );
 process.on("SIGTERM", () =>
   server.close(() => {

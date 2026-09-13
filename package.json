@@ -12,6 +12,7 @@
     "start": "node server/index.mjs",
     "test": "node --test tests/*.test.mjs",
     "backup": "node scripts/backup.mjs",
+    "set-admin": "node scripts/set-admin.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"
   },

@@ -760,7 +760,6 @@ export default function Admin() {
                 ? "สร้างระบบ"
                 : "เข้าสู่ระบบ"}
           </button>
-          <a href="/player">เปิดจอนี้เป็น Web Player →</a>
         </form>
       </main>
     );
@@ -810,9 +809,6 @@ export default function Admin() {
             </button>
           ))}
         </nav>
-        <a href="/player" target="_blank" rel="noreferrer">
-          <Play size={16} /> เปิด Web Player
-        </a>
         <div className="profile">
           <strong>{user.name}</strong>
           <small>
@@ -1211,11 +1207,7 @@ export default function Admin() {
                 <div>
                   <h3 style={{ margin: "0 0 4px" }}>เปิด Player บนจอที่ต้องการลงทะเบียน</h3>
                   <p style={{ margin: 0 }}>
-                    เข้า{" "}
-                    <a href="/player" target="_blank" rel="noreferrer">
-                      {location.origin}/player
-                    </a>{" "}
-                    แล้วนำรหัส 6 หลักมากรอกที่ปุ่ม “+ ลงทะเบียนจอ”
+                    เปิดแอปพลิเคชัน Shotel Player บนกล่อง Android หรือจอปลายทาง แล้วนำรหัส 6 หลักมากรอกที่ปุ่ม “+ ลงทะเบียนจอ”
                   </p>
                 </div>
               </div>
@@ -1841,7 +1833,7 @@ export default function Admin() {
         >
           {modal === "displays" && (
             <form onSubmit={submit((b) => api("/displays", b, org))}>
-              <p>เปิด /player บนจอปลายทางก่อน แล้วใช้รหัสที่จอนั้นแสดง</p>
+              <p>เปิดแอป Shotel Player บนจอปลายทางก่อน แล้วใช้รหัสที่จอนั้นแสดง</p>
               <label>
                 รหัสจับคู่
                 <input

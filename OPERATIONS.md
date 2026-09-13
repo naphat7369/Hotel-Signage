@@ -10,7 +10,33 @@ npm run build
 npm start
 ```
 
-เปิด http://127.0.0.1:8787 สร้างองค์กรและผู้ดูแลครั้งแรก รหัสผ่านขั้นต่ำ 12 ตัวอักษร ไม่มีบัญชีหรือรหัสผ่านเริ่มต้น ฐานข้อมูลและไฟล์จริงอยู่ใน `data` (SQLite WAL + โฟลเดอร์ media/screens) อย่าลบ data เมื่อต้องการอัปเดตโปรแกรม
+## บัญชีผู้ดูแลระบบเริ่มต้น (Default Admin)
+
+ระบบตั้งค่าบัญชีเริ่มต้นให้พร้อมใช้งานทันที เหมาะสำหรับการนำขึ้น Proxmox (LXC/VM), Docker หรือ Server ใหม่:
+- **Email**: `admin@shotel.com` (หรือ `it@s31hotel.com`)
+- **Password**: `admin12345678`
+
+หากต้องการเปลี่ยนรหัสผ่านผ่าน Command Line:
+```bash
+npm run set-admin
+# หรือระบุอีเมลและรหัสผ่านใหม่:
+node scripts/set-admin.mjs admin@shotel.com NewPassword1234
+```
+
+## การนำขึ้น Proxmox (LXC / VM / Debian / Ubuntu)
+
+1. ติดตั้ง Node.js 22+ หรือ 24
+2. Clone repository:
+   ```bash
+   git clone https://github.com/naphat7369/Hotel-Signage.git
+   cd Hotel-Signage
+   npm ci
+   npm run build
+   npm start
+   ```
+3. เซิร์ฟเวอร์จะเปิดรับการเชื่อมต่อที่พอร์ต 8787 (`0.0.0.0:8787`) อัตโนมัติ
+4. เปิดเบราว์เซอร์เข้าที่: `http://<IP-ของ-Proxmox>:8787`
+5. เข้าสู่ระบบด้วย `admin@shotel.com` / `admin12345678` ได้ทันที
 
 1. เพิ่มสาขาพร้อม timezone
 2. อัปโหลดรูป JPEG/PNG/WebP หรือ MP4 H.264/AAC แนะนำ 1920×1080
