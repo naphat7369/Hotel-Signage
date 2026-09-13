@@ -2051,7 +2051,7 @@ export default function Admin() {
                       type="file"
                       ref={playlistFileRef}
                       multiple
-                      accept="image/jpeg,image/png,image/webp,video/mp4"
+                      accept="image/jpeg,image/png,image/webp,video/mp4,.jpg,.jpeg,.png,.webp,.mp4"
                       style={{ display: "none" }}
                       onChange={(e) => handlePlaylistUpload(e.target.files)}
                     />
@@ -2432,7 +2432,7 @@ export default function Admin() {
                         <input
                           type="file"
                           ref={pickerFileRef}
-                          accept="image/jpeg,image/png,image/webp,video/mp4"
+                          accept="image/jpeg,image/png,image/webp,video/mp4,.jpg,.jpeg,.png,.webp,.mp4"
                           style={{ display: "none" }}
                           onChange={(e) => handlePickerUpload(e.target.files)}
                         />
@@ -2454,8 +2454,31 @@ export default function Admin() {
                       {!filteredPickerMedia.length ? (
                         <div className="picker-empty-state">
                           <Images size={40} />
-                          <p>ไม่พบไฟล์สื่อที่ตรงกับเงื่อนไข</p>
-                          <small>ลองเปลี่ยนคำค้นหา หรือกดปุ่ม "อัปโหลดไฟล์ใหม่" ด้านบน</small>
+                          {!branchMedia.length ? (
+                            <>
+                              <p style={{ fontWeight: 600, fontSize: "1rem", color: "#1e293b", margin: "8px 0 4px" }}>
+                                ยังไม่มีไฟล์สื่อในคลังของสาขานี้
+                              </p>
+                              <small style={{ color: "#64748b", marginBottom: 12 }}>
+                                กดปุ่มด้านล่างเพื่ออัปโหลดรูปภาพ (JPEG, PNG, WebP) หรือวิดีโอ (MP4) เข้าสู่ระบบ
+                              </small>
+                              <button
+                                type="button"
+                                className="primary"
+                                style={{ display: "inline-flex", alignItems: "center", gap: 6, margin: "6px auto 0", padding: "8px 18px", fontSize: "0.88rem" }}
+                                onClick={() => pickerFileRef.current?.click()}
+                              >
+                                <Upload size={15} /> อัปโหลดไฟล์จากเครื่อง
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <p style={{ fontWeight: 600, fontSize: "1rem", color: "#1e293b", margin: "8px 0 4px" }}>
+                                ไม่พบไฟล์สื่อที่ตรงกับคำค้นหา
+                              </p>
+                              <small style={{ color: "#64748b" }}>ลองลบคำค้นหา หรือกดเลือกตัวกรอง "ทั้งหมด"</small>
+                            </>
+                          )}
                         </div>
                       ) : (
                         filteredPickerMedia.map((m) => {
