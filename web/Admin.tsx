@@ -2030,23 +2030,6 @@ export default function Admin() {
                     </div>
                   </div>
                   <div className="add-card-actions">
-                    <button
-                      type="button"
-                      className="btn-add-page"
-                      onClick={() => {
-                        if (!formBranch) {
-                          setError("กรุณาเลือกสาขาก่อนเพิ่มหน้า");
-                          return;
-                        }
-                        setPickerSearch("");
-                        setPickerType("all");
-                        setMediaPickerMode("add");
-                      }}
-                    >
-                      <Plus size={16} />
-                      <span>กด Add Page (เลือกจากคลังสื่อ)</span>
-                    </button>
-
                     <input
                       type="file"
                       ref={playlistFileRef}
@@ -2057,7 +2040,7 @@ export default function Admin() {
                     />
                     <button
                       type="button"
-                      className="btn-upload-secondary"
+                      className="btn-add-page"
                       disabled={busy}
                       onClick={() => {
                         if (!formBranch) {
@@ -2067,8 +2050,25 @@ export default function Admin() {
                         playlistFileRef.current?.click();
                       }}
                     >
-                      <Upload size={15} />
-                      <span>อัปโหลดไฟล์ใหม่</span>
+                      <Upload size={16} />
+                      <span>+ อัปโหลดไฟล์ใหม่เข้าผัง (Add Page)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn-upload-secondary"
+                      onClick={() => {
+                        if (!formBranch) {
+                          setError("กรุณาเลือกสาขาก่อนเพิ่มหน้า");
+                          return;
+                        }
+                        setPickerSearch("");
+                        setPickerType("all");
+                        setMediaPickerMode("add");
+                      }}
+                    >
+                      <Images size={15} />
+                      <span>เลือกจากคลังสื่อ ({branchMedia.length})</span>
                     </button>
                   </div>
                 </div>
@@ -2452,34 +2452,38 @@ export default function Admin() {
 
                     <div className="media-picker-grid">
                       {!filteredPickerMedia.length ? (
-                        <div className="picker-empty-state">
-                          <Images size={40} />
-                          {!branchMedia.length ? (
-                            <>
-                              <p style={{ fontWeight: 600, fontSize: "1rem", color: "#1e293b", margin: "8px 0 4px" }}>
-                                ยังไม่มีไฟล์สื่อในคลังของสาขานี้
-                              </p>
-                              <small style={{ color: "#64748b", marginBottom: 12 }}>
-                                กดปุ่มด้านล่างเพื่ออัปโหลดรูปภาพ (JPEG, PNG, WebP) หรือวิดีโอ (MP4) เข้าสู่ระบบ
-                              </small>
-                              <button
-                                type="button"
-                                className="primary"
-                                style={{ display: "inline-flex", alignItems: "center", gap: 6, margin: "6px auto 0", padding: "8px 18px", fontSize: "0.88rem" }}
-                                onClick={() => pickerFileRef.current?.click()}
-                              >
-                                <Upload size={15} /> อัปโหลดไฟล์จากเครื่อง
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <p style={{ fontWeight: 600, fontSize: "1rem", color: "#1e293b", margin: "8px 0 4px" }}>
-                                ไม่พบไฟล์สื่อที่ตรงกับคำค้นหา
-                              </p>
-                              <small style={{ color: "#64748b" }}>ลองลบคำค้นหา หรือกดเลือกตัวกรอง "ทั้งหมด"</small>
-                            </>
-                          )}
-                        </div>
+                        !branchMedia.length ? (
+                          <div
+                            className="picker-empty-dropzone"
+                            onClick={() => pickerFileRef.current?.click()}
+                          >
+                            <div className="dropzone-icon">📤</div>
+                            <h4>ยังไม่มีไฟล์สื่อในคลัง — คลิกที่นี่เพื่อเลือกไฟล์</h4>
+                            <p>
+                              รองรับภาพ JPEG, PNG, WebP และวิดีโอ MP4 (ระบบจะอัปโหลดและเพิ่มเข้าหน้านี้ให้อัตโนมัติ)
+                            </p>
+                            <button
+                              type="button"
+                              className="primary"
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 6,
+                                pointerEvents: "none",
+                              }}
+                            >
+                              <Upload size={15} /> เลือกไฟล์จากเครื่องของคุณ
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="picker-empty-state">
+                            <Images size={40} />
+                            <p style={{ fontWeight: 600, fontSize: "1rem", color: "#1e293b", margin: "8px 0 4px" }}>
+                              ไม่พบไฟล์สื่อที่ตรงกับคำค้นหา
+                            </p>
+                            <small style={{ color: "#64748b" }}>ลองลบคำค้นหา หรือกดเลือกตัวกรอง "ทั้งหมด"</small>
+                          </div>
+                        )
                       ) : (
                         filteredPickerMedia.map((m) => {
                           const isVid = m.type?.startsWith("video");

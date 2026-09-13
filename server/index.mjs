@@ -377,7 +377,9 @@ async function handler(req, res) {
     res.setHeader("X-Frame-Options", "SAMEORIGIN");
     if (!["GET", "HEAD"].includes(req.method) && req.headers.origin) {
       const origin = new URL(req.headers.origin);
-      if (origin.host !== req.headers.host) fail(403, "Origin ไม่ถูกต้อง");
+      const host = req.headers["x-forwarded-host"] || req.headers.host;
+      if (origin.host !== host && origin.hostname !== "localhost" && origin.hostname !== "127.0.0.1")
+        fail(403, "Origin ไม่ถูกต้อง");
     }
     if (path === "/api/health") return send(res, 200, { ok: true });
     if (path === "/api/bootstrap" && req.method === "GET")

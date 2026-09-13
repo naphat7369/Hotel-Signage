@@ -1906,6 +1906,42 @@ label textarea::placeholder {
   margin: 8px 0 4px;
 }
 
+.picker-empty-dropzone {
+  grid-column: 1 / -1;
+  border: 2px dashed #99f6e4;
+  background: linear-gradient(180deg, #f0fdfa 0%, #f8fafc 100%);
+  border-radius: 12px;
+  padding: 44px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.picker-empty-dropzone:hover {
+  border-color: #00897d;
+  background: #f0fdfa;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 137, 125, 0.12);
+}
+
+.picker-empty-dropzone .dropzone-icon {
+  font-size: 40px;
+  margin-bottom: 10px;
+}
+
+.picker-empty-dropzone h4 {
+  font-size: 16.5px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 6px;
+}
+
+.picker-empty-dropzone p {
+  font-size: 13.5px;
+  color: #64748b;
+  margin: 0 0 16px;
+}
+
 .picker-media-card {
   background: #ffffff;
   border: 1.5px solid #e2e8f0;
