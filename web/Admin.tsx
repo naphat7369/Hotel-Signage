@@ -343,6 +343,11 @@ export default function Admin() {
     return () => clearInterval(id);
   }, [org, !!user]);
   useEffect(() => {
+    if (!formBranch && (data.branches as Row[])?.length > 0) {
+      setFormBranch((data.branches as Row[])[0].id);
+    }
+  }, [formBranch, data.branches]);
+  useEffect(() => {
     if (tab === "reports" && user)
       api("/reports", undefined, org)
         .then(setReport)
@@ -510,6 +515,7 @@ export default function Admin() {
     work(() => api(path, b, org)).catch(() => {});
   }
   function branchField() {
+    const selectedBranch = formBranch || branches[0]?.id || "";
     return (
       <label>
         <span className="label-text">
@@ -518,13 +524,13 @@ export default function Admin() {
         <select
           name="branch"
           required
-          value={formBranch}
+          value={selectedBranch}
           onChange={(e) => {
             setFormBranch(e.target.value);
             setTargets([]);
           }}
         >
-          <option value="">เลือกสาขา</option>
+          {branches.length > 1 && <option value="">เลือกสาขา</option>}
           {branches.map((b) => (
             <option key={b.id} value={b.id}>
               {b.name}
@@ -535,18 +541,20 @@ export default function Admin() {
     );
   }
   async function upload(file: File): Promise<Row> {
-    if (!formBranch) throw new Error("กรุณาเลือกสาขา");
+    const activeBranch = formBranch || (data.branches as Row[])?.[0]?.id;
+    if (!activeBranch) throw new Error("ไม่พบสาขาในระบบ กรุณาสร้างสาขาก่อน");
+    if (!formBranch) setFormBranch(activeBranch);
     return new Promise<Row>((ok, no) => {
       const x = new XMLHttpRequest();
       x.open(
         "POST",
-        `/api/media?org=${org}&branch=${formBranch}&name=${encodeURIComponent(file.name)}`,
+        `/api/media?org=${org}&branch=${activeBranch}&name=${encodeURIComponent(file.name)}`,
       );
       x.upload.onprogress = (e) =>
         setProgress(
           e.lengthComputable ? Math.round((e.loaded / e.total) * 100) : 0,
         );
-      x.onerror = () => no(new Error("อัปโหลดไม่สำเร็จ"));
+      x.onerror = () => no(new Error("อัปโหลดไม่สำเร็จ (กรุณาตรวจสอบการเชื่อมต่อเครือข่าย)"));
       x.onload = () => {
         if (x.status < 300) {
           try {
@@ -556,9 +564,10 @@ export default function Admin() {
           }
         } else {
           try {
-            no(new Error(JSON.parse(x.responseText).error));
+            const err = JSON.parse(x.responseText);
+            no(new Error(err.error || `อัปโหลดไม่สำเร็จ (${x.status})`));
           } catch {
-            no(new Error("อัปโหลดไม่สำเร็จ"));
+            no(new Error(`อัปโหลดไม่สำเร็จ (${x.status})`));
           }
         }
       };
@@ -567,10 +576,12 @@ export default function Admin() {
   }
   async function handlePlaylistUpload(files: FileList | null) {
     if (!files || !files.length) return;
-    if (!formBranch) {
-      setError("กรุณาเลือกสาขาก่อนอัปโหลดสื่อ");
+    const activeBranch = formBranch || (data.branches as Row[])?.[0]?.id;
+    if (!activeBranch) {
+      setError("ไม่พบสาขาในระบบ กรุณาสร้างสาขาก่อน");
       return;
     }
+    if (!formBranch) setFormBranch(activeBranch);
     await work(async () => {
       const newItems: Row[] = [];
       const newMediaList: Row[] = [];
@@ -595,10 +606,12 @@ export default function Admin() {
   }
   async function handlePickerUpload(files: FileList | null) {
     if (!files || !files.length) return;
-    if (!formBranch) {
-      setError("กรุณาเลือกสาขาก่อนอัปโหลดสื่อ");
+    const activeBranch = formBranch || (data.branches as Row[])?.[0]?.id;
+    if (!activeBranch) {
+      setError("ไม่พบสาขาในระบบ กรุณาสร้างสาขาก่อน");
       return;
     }
+    if (!formBranch) setFormBranch(activeBranch);
     await work(async () => {
       const file = files[0];
       const m = await upload(file);

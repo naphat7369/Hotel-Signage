@@ -315,7 +315,7 @@ async function receiveFile(req, path, max) {
   }
 }
 function signature(h) {
-  if (h.subarray(0, 3).equals(Buffer.from([255, 216, 255])))
+  if (h.length >= 2 && h[0] === 0xff && h[1] === 0xd8)
     return "image/jpeg";
   if (h.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])))
     return "image/png";
@@ -324,7 +324,8 @@ function signature(h) {
     h.toString("ascii", 8, 12) === "WEBP"
   )
     return "image/webp";
-  if (h.toString("ascii", 4, 8) === "ftyp") return "video/mp4";
+  if (h.includes(Buffer.from("ftyp")) || h.toString("ascii", 4, 8) === "ftyp")
+    return "video/mp4";
   fail(400, "รองรับ JPEG, PNG, WebP และ MP4 เท่านั้น");
 }
 function stream(res, req, path, type) {
