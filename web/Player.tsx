@@ -362,12 +362,14 @@ export default function Player() {
           if (!canceled) setTimeout(() => setIndex((i) => i + 1), 2000);
           return;
         }
-        const blob = await r.blob();
-        if ((await digest(blob)) !== f.checksum) {
+        const rawBlob = await r.blob();
+        if ((await digest(rawBlob)) !== f.checksum) {
           const c = await caches.open(cacheName);
           await c.delete(cacheKey(f.media));
           throw new Error("ไฟล์เสีย กำลังรอซ่อม " + f.name);
         }
+        const mimeType = f.type || (f.name?.endsWith(".mp4") ? "video/mp4" : "");
+        const blob = rawBlob.type ? rawBlob : (mimeType ? new Blob([rawBlob], { type: mimeType }) : rawBlob);
         url = URL.createObjectURL(blob);
         if (canceled) {
           URL.revokeObjectURL(url);
@@ -488,15 +490,36 @@ export default function Player() {
               <video
                 ref={(e) => {
                   media.current = e;
+                  if (e) {
+                    e.play().catch((err) => {
+                      console.warn("[Player Video Autoplay Blocked]", err);
+                    });
+                  }
                 }}
                 src={currentMedia.src}
                 autoPlay
                 muted
                 playsInline
                 onEnded={complete}
-                onError={() => {
-                  setError("Browser เล่นวิดีโอนี้ไม่ได้");
-                  setIndex((i) => i + 1);
+                onError={(e) => {
+                  const mediaErr = (e.target as HTMLVideoElement)?.error;
+                  const code = mediaErr?.code;
+                  const codeMsg =
+                    code === 4
+                      ? "รูปแบบไฟล์/Codec ไม่รองรับบนอุปกรณ์นี้ (แนะนำใช้ MP4 H.264)"
+                      : code === 3
+                        ? "ไม่สามารถ Decode วิดีโอได้ (อาจเป็น H.265 หรือความละเอียดสูงเกินไป)"
+                        : code === 2
+                          ? "เครือข่ายขัดข้องระหว่างดึงวิดีโอ"
+                          : "เกิดข้อผิดพลาดในการเล่น";
+                  console.error(
+                    `[Player Video Error] "${currentMedia.item.name}":`,
+                    mediaErr,
+                  );
+                  setError(
+                    `เล่นวิดีโอ "${currentMedia.item.name}" ไม่ได้: ${codeMsg}`,
+                  );
+                  setTimeout(() => setIndex((i) => i + 1), 4000);
                 }}
               />
             ) : (
