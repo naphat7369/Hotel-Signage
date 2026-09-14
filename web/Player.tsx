@@ -35,10 +35,8 @@ export default function Player() {
     prevMedia = useRef<{ item: Row; src: string; key: string } | null>(null),
     outgoingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   activeItem.current = item;
-  const capable =
-    typeof window !== "undefined" &&
-  const hasCaches = isSecureContext && "caches" in window;
-  const capable = "indexedDB" in window;
+  const hasCaches = typeof window !== "undefined" && isSecureContext && "caches" in window;
+  const capable = typeof window !== "undefined" && "indexedDB" in window;
   async function request(path: string, body?: any, key = credential?.token) {
     const r = await fetch("/api" + path, {
       headers: {
