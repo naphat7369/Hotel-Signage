@@ -222,7 +222,8 @@ function user(req) {
   return u;
 }
 function device(req) {
-  const key = req.headers.authorization?.replace(/^Bearer /, "");
+  const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+  const key = req.headers.authorization?.replace(/^Bearer /, "") || url.searchParams.get("token");
   const r = key && one("SELECT device FROM device_keys WHERE hash=?", sha(key));
   if (!r) fail(401, "จอยังไม่ได้จับคู่หรือถูกยกเลิกแล้ว");
   const d = entity(r.device, "displays");

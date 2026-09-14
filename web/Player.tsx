@@ -386,7 +386,7 @@ export default function Player() {
           const blob = rawBlob.type ? rawBlob : (mimeType ? new Blob([rawBlob], { type: mimeType }) : rawBlob);
           url = URL.createObjectURL(blob);
         } else {
-          url = "/api/media/" + f.media + "/file";
+          url = "/api/device/media/" + f.media + "?token=" + (credential?.token || "");
         }
         if (canceled) {
           if (r) URL.revokeObjectURL(url);
