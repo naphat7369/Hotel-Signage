@@ -167,8 +167,12 @@ public class PlayerActivity extends Activity {
       }
      }
      video=new MediaPlayer();
-     try(FileInputStream fis=new FileInputStream(file)){
-      video.setDataSource(fis.getFD());
+     try{
+      video.setDataSource(file.getAbsolutePath());
+     }catch(Exception ex){
+      try(FileInputStream fis=new FileInputStream(file)){
+       video.setDataSource(fis.getFD(),0,file.length());
+      }
      }
      video.setSurface(surface);
      video.setVolume(0,0);
