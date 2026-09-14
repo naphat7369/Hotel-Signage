@@ -115,6 +115,15 @@ export default function Player() {
         summary = { total: 0, ready: 0 },
         problem = "";
       try {
+        const allItems = (m: any) => {
+          const map = new Map<string, Row>();
+          for (const p of [
+            m?.fallback,
+            ...(m?.schedules || []).map((s: any) => s.snapshot),
+          ].filter(Boolean))
+            for (const i of p.items) map.set(i.media, i);
+          return [...map.values()];
+        };
         // Detect eviction from the active program before trying network; never claim offline readiness from the manifest alone.
         const oldItems = allItems(active);
         summary.total = oldItems.length;
