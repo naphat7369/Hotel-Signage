@@ -990,9 +990,16 @@ async function handler(req, res) {
             e.org,
           )
             .map((r) => entity(r.id))
-            .filter((s) => s.playlist === id);
+            .filter((s) => {
+              if (s.playlist === id) return true;
+              try {
+                const v = entity(s.version, "versions");
+                if (v && v.playlist === id) return true;
+              } catch {}
+              return false;
+            });
           for (const s of relatedSchedules) {
-            put("schedules", s.org, s.branch, { ...s, version: v.id }, s.id);
+            put("schedules", s.org, s.branch, { ...s, version: v.id, playlist: id }, s.id);
           }
           logInfo("PLAYLIST_PUBLISHED", req, {
             id,
@@ -1330,6 +1337,7 @@ async function handler(req, res) {
           const r = put("schedules", org, branch, {
             ...oldData,
             name: str(b.name),
+            playlist: version.playlist || b.playlist,
             version: version.id,
             targetType: type,
             targets,

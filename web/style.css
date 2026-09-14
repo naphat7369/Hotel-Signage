@@ -3088,3 +3088,199 @@ progress {
   transform: translateY(-1px);
 }
 
+/* ========================================================
+   Interactive Filter Toolbar & Status Filter Chips
+   ======================================================== */
+.filter-toolbar {
+  background: #ffffff;
+  border: 1px solid #dce4ec;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 1px 4px rgba(16, 32, 57, 0.03);
+}
+
+.filter-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-inputs-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 240px;
+  flex-wrap: wrap;
+}
+
+.filter-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  max-width: 380px;
+  min-width: 200px;
+}
+
+.filter-search-wrap svg {
+  position: absolute;
+  left: 11px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.filter-search-wrap input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 32px 8px 34px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 13.5px;
+  background: #f8fafc;
+  color: #1e293b;
+  transition: all 0.15s ease;
+}
+
+.filter-search-wrap input:focus {
+  border-color: #00897d;
+  background: #ffffff;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 137, 125, 0.12);
+}
+
+.filter-clear-btn {
+  position: absolute;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.filter-clear-btn:hover {
+  color: #334155;
+  background: #e2e8f0;
+}
+
+.filter-branch-select {
+  padding: 8px 12px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 13.5px;
+  background: #f8fafc;
+  color: #1e293b;
+  cursor: pointer;
+}
+
+.filter-branch-select:focus {
+  border-color: #00897d;
+  background: #ffffff;
+  outline: none;
+}
+
+.filter-counter-text {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.filter-chips-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 13px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 20px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  user-select: none;
+}
+
+.filter-chip-btn:hover {
+  border-color: #99f6e4;
+  background: #f0fdfa;
+  color: #0f766e;
+}
+
+.filter-chip-btn.active {
+  background: #00897d;
+  color: #ffffff;
+  border-color: #00897d;
+  box-shadow: 0 2px 6px rgba(0, 137, 125, 0.28);
+}
+
+.filter-chip-badge {
+  display: inline-grid;
+  place-items: center;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  background: #f1f5f9;
+  color: #334155;
+  transition: all 0.16s ease;
+}
+
+.filter-chip-btn:hover .filter-chip-badge {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+.filter-chip-btn.active .filter-chip-badge {
+  background: rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+}
+
+/* Status tags for playlist cards */
+.layout-tag.active-tag {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  font-weight: 600;
+}
+
+.layout-tag.upcoming-tag {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  font-weight: 600;
+}
+
+.layout-tag.expired-tag {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  font-weight: 600;
+}
+
+.layout-tag.unscheduled-tag {
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+

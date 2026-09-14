@@ -411,6 +411,12 @@ export default function Admin() {
     [mediaPickerMode, setMediaPickerMode] = useState<"add" | number | null>(null),
     [pickerSearch, setPickerSearch] = useState(""),
     [pickerType, setPickerType] = useState<"all" | "image" | "video">("all"),
+    [scheduleFilter, setScheduleFilter] = useState<"all" | "active" | "upcoming" | "expired" | "default" | "archived">("all"),
+    [scheduleSearch, setScheduleSearch] = useState(""),
+    [scheduleBranch, setScheduleBranch] = useState(""),
+    [playlistFilter, setPlaylistFilter] = useState<"all" | "active" | "expired" | "default" | "unscheduled">("all"),
+    [playlistSearch, setPlaylistSearch] = useState(""),
+    [playlistBranch, setPlaylistBranch] = useState(""),
     [systemLogs, setSystemLogs] = useState<string[]>([]);
   const lastOrg = useRef("");
   const playlistFileRef = useRef<HTMLInputElement>(null);
@@ -591,6 +597,179 @@ export default function Admin() {
   });
   const lookup = (rows: Row[], id: string) =>
     rows.find((r) => r.id === id)?.name || id;
+
+  const getSchedulePlaylistId = (s: Row) =>
+    s.playlist || versions.find((v) => v.id === s.version)?.playlist || "";
+
+  const getPlaylistRelatedSchedules = (p: Row) =>
+    schedules.filter((s) => {
+      const pid = getSchedulePlaylistId(s);
+      return pid === p.id || s.version === p.published;
+    });
+
+  const getPlaylistStatusInfo = (p: Row) => {
+    const br = branches.find((b) => b.id === p.branch);
+    const isDefault = Boolean(br?.fallback === p.published || p.isDefault);
+    const related = getPlaylistRelatedSchedules(p);
+
+    const activeSchedule = related.find((s) => {
+      const info = getScheduleInfo(s);
+      return !info.isExpired && !info.isUpcoming && s.state === "published";
+    });
+    const upcomingSchedule = related.find((s) => {
+      const info = getScheduleInfo(s);
+      return info.isUpcoming && s.state === "published";
+    });
+    const expiredSchedule = related.find((s) => {
+      const info = getScheduleInfo(s);
+      return info.isExpired && s.state === "published";
+    });
+
+    const hasActive = Boolean(activeSchedule);
+    const hasUpcoming = Boolean(upcomingSchedule);
+    const hasExpired = Boolean(expiredSchedule);
+    const isUnscheduled = !isDefault && related.length === 0;
+
+    return {
+      isDefault,
+      hasActive,
+      hasUpcoming,
+      hasExpired,
+      isUnscheduled,
+      activeSchedule,
+      upcomingSchedule,
+      expiredSchedule,
+      relatedCount: related.length,
+    };
+  };
+
+  // Schedule filtering computations
+  const effectiveScheduleBranch = scheduleBranch || branch;
+  const scopedSchedules = schedules.filter(
+    (s) => !effectiveScheduleBranch || s.branch === effectiveScheduleBranch,
+  );
+  const scopedDefaults = standaloneDefaultPlaylists.filter(
+    (p) => !effectiveScheduleBranch || p.branch === effectiveScheduleBranch,
+  );
+
+  const scheduleCounts = {
+    all: scopedDefaults.length + scopedSchedules.length,
+    active:
+      scopedDefaults.length +
+      scopedSchedules.filter((s) => {
+        const info = getScheduleInfo(s);
+        return !info.isExpired && !info.isUpcoming && s.state === "published";
+      }).length,
+    upcoming: scopedSchedules.filter((s) => {
+      const info = getScheduleInfo(s);
+      return info.isUpcoming && s.state === "published";
+    }).length,
+    expired: scopedSchedules.filter((s) => {
+      const info = getScheduleInfo(s);
+      return info.isExpired && s.state === "published";
+    }).length,
+    default:
+      scopedDefaults.length +
+      scopedSchedules.filter((s) => isScheduleUsingDefault(s)).length,
+    archived: scopedSchedules.filter(
+      (s) => s.state === "archived" || s.state === "draft",
+    ).length,
+  };
+
+  const matchesScheduleSearch = (s: Row) => {
+    if (!scheduleSearch) return true;
+    const q = scheduleSearch.toLowerCase();
+    const vName = lookup(versions, s.version);
+    const pName = lookup(playlists, s.playlist);
+    const brName = lookup(branches, s.branch);
+    const targetText =
+      s.targetType === "display"
+        ? s.targets.map((id: string) => lookup(displays, id)).join(" ")
+        : s.targetType === "group"
+          ? `กลุ่ม ${s.group}`
+          : s.targetType === "branch"
+            ? brName
+            : "ทุกจอ";
+    return [s.name, vName, pName, brName, targetText].some((txt) =>
+      txt?.toLowerCase().includes(q),
+    );
+  };
+
+  const matchesDefaultSearch = (p: Row) => {
+    if (!scheduleSearch) return true;
+    const q = scheduleSearch.toLowerCase();
+    const brName = lookup(branches, p.branch);
+    return [p.name, p.description, brName, "ผังเริ่มต้น", "Default"].some((txt) =>
+      txt?.toLowerCase().includes(q),
+    );
+  };
+
+  const filteredStandaloneDefaults = scopedDefaults.filter((p) => {
+    if (["upcoming", "expired", "archived"].includes(scheduleFilter))
+      return false;
+    return matchesDefaultSearch(p);
+  });
+
+  const filteredSchedules = scopedSchedules.filter((s) => {
+    if (!matchesScheduleSearch(s)) return false;
+    const info = getScheduleInfo(s);
+    const isDefault = isScheduleUsingDefault(s);
+
+    if (scheduleFilter === "all") return true;
+    if (scheduleFilter === "active")
+      return !info.isExpired && !info.isUpcoming && s.state === "published";
+    if (scheduleFilter === "upcoming")
+      return info.isUpcoming && s.state === "published";
+    if (scheduleFilter === "expired")
+      return info.isExpired && s.state === "published";
+    if (scheduleFilter === "default") return isDefault;
+    if (scheduleFilter === "archived")
+      return s.state === "archived" || s.state === "draft";
+    return true;
+  });
+
+  // Playlist filtering computations
+  const effectivePlaylistBranch = playlistBranch || branch;
+  const scopedPlaylists = playlists.filter(
+    (p) => !effectivePlaylistBranch || p.branch === effectivePlaylistBranch,
+  );
+
+  const playlistCounts = {
+    all: scopedPlaylists.length,
+    active: scopedPlaylists.filter(
+      (p) => getPlaylistStatusInfo(p).hasActive,
+    ).length,
+    expired: scopedPlaylists.filter(
+      (p) => getPlaylistStatusInfo(p).hasExpired,
+    ).length,
+    default: scopedPlaylists.filter(
+      (p) => getPlaylistStatusInfo(p).isDefault,
+    ).length,
+    unscheduled: scopedPlaylists.filter(
+      (p) => getPlaylistStatusInfo(p).isUnscheduled,
+    ).length,
+  };
+
+  const matchesPlaylistSearch = (p: Row) => {
+    if (!playlistSearch) return true;
+    const q = playlistSearch.toLowerCase();
+    const brName = lookup(branches, p.branch);
+    return [p.name, p.description, brName].some((txt) =>
+      txt?.toLowerCase().includes(q),
+    );
+  };
+
+  const filteredPlaylists = scopedPlaylists.filter((p) => {
+    if (!matchesPlaylistSearch(p)) return false;
+    const status = getPlaylistStatusInfo(p);
+
+    if (playlistFilter === "all") return true;
+    if (playlistFilter === "active") return status.hasActive;
+    if (playlistFilter === "expired") return status.hasExpired;
+    if (playlistFilter === "default") return status.isDefault;
+    if (playlistFilter === "unscheduled") return status.isUnscheduled;
+    return true;
+  });
   const vItems = (p: Row) =>
     (p.items || []).map((i: Row) => ({
       ...i,
@@ -1407,8 +1586,95 @@ export default function Admin() {
           )}
           {tab === "layouts" && (
             <>
+              <div className="filter-toolbar">
+                <div className="filter-controls-row">
+                  <div className="filter-inputs-group">
+                    <div className="filter-search-wrap">
+                      <Search size={16} />
+                      <input
+                        type="text"
+                        placeholder="ค้นหาเพลย์ลิสต์ (ชื่อผัง, รายละเอียด)..."
+                        value={playlistSearch}
+                        onChange={(e) => setPlaylistSearch(e.target.value)}
+                      />
+                      {playlistSearch && (
+                        <button
+                          type="button"
+                          className="filter-clear-btn"
+                          onClick={() => setPlaylistSearch("")}
+                          aria-label="ล้างคำค้นหา"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                    {branches.length > 1 && (
+                      <select
+                        className="filter-branch-select"
+                        value={playlistBranch}
+                        onChange={(e) => setPlaylistBranch(e.target.value)}
+                        aria-label="กรองสาขา"
+                      >
+                        <option value="">ทุกสาขา ({branches.length})</option>
+                        {branches.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  <div className="filter-counter-text">
+                    แสดง {filteredPlaylists.length} จาก {scopedPlaylists.length} เพลย์ลิสต์
+                  </div>
+                </div>
+
+                <div className="filter-chips-row">
+                  <button
+                    type="button"
+                    className={`filter-chip-btn ${playlistFilter === "all" ? "active" : ""}`}
+                    onClick={() => setPlaylistFilter("all")}
+                  >
+                    <span>ทั้งหมด</span>
+                    <span className="filter-chip-badge">{playlistCounts.all}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-chip-btn ${playlistFilter === "active" ? "active" : ""}`}
+                    onClick={() => setPlaylistFilter("active")}
+                  >
+                    <span>🟢 กำลังมีคิวงาน</span>
+                    <span className="filter-chip-badge">{playlistCounts.active}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-chip-btn ${playlistFilter === "expired" ? "active" : ""}`}
+                    onClick={() => setPlaylistFilter("expired")}
+                  >
+                    <span>⛔ งานหมดอายุแล้ว</span>
+                    <span className="filter-chip-badge">{playlistCounts.expired}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-chip-btn ${playlistFilter === "default" ? "active" : ""}`}
+                    onClick={() => setPlaylistFilter("default")}
+                  >
+                    <span>⭐ ผังเริ่มต้น</span>
+                    <span className="filter-chip-badge">{playlistCounts.default}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-chip-btn ${playlistFilter === "unscheduled" ? "active" : ""}`}
+                    onClick={() => setPlaylistFilter("unscheduled")}
+                  >
+                    <span>📂 ยังไม่ผูกคิวงาน</span>
+                    <span className="filter-chip-badge">{playlistCounts.unscheduled}</span>
+                  </button>
+                </div>
+              </div>
+
               <div className="cards layout-cards-grid">
-                {visible(playlists).map((p) => {
+                {filteredPlaylists.map((p) => {
                   const br = branches.find((b) => b.id === p.branch);
                   const isBranchDefault =
                     br?.fallback === p.published || p.isDefault;
@@ -1416,6 +1682,7 @@ export default function Admin() {
                     (s: number, it: Row) => s + (Number(it.duration) || 10),
                     0,
                   );
+                  const status = getPlaylistStatusInfo(p);
                   return (
                     <article className="panel layout-card" key={p.id}>
                       {/* Card Header: Avatar + Title + Branch/Default Tags + Status Pill */}
@@ -1437,6 +1704,35 @@ export default function Admin() {
                               {isBranchDefault && (
                                 <span className="layout-tag default-tag">
                                   ⭐ ผังเริ่มต้น
+                                </span>
+                              )}
+                              {status.hasActive && (
+                                <span
+                                  className="layout-tag active-tag"
+                                  title={`มีงานตารางกำลังเล่นอยู่: ${status.activeSchedule?.name || ""}`}
+                                >
+                                  🟢 กำลังแสดงในตาราง
+                                </span>
+                              )}
+                              {!status.hasActive && status.hasUpcoming && (
+                                <span
+                                  className="layout-tag upcoming-tag"
+                                  title={`มีงานรอเริ่ม: ${status.upcomingSchedule?.name || ""}`}
+                                >
+                                  🕒 รอเริ่มตามตาราง
+                                </span>
+                              )}
+                              {!status.hasActive && !status.hasUpcoming && status.hasExpired && (
+                                <span
+                                  className="layout-tag expired-tag"
+                                  title={`งานในตารางหมดอายุแล้ว: ${status.expiredSchedule?.name || ""}`}
+                                >
+                                  ⛔ งานในตารางหมดอายุแล้ว
+                                </span>
+                              )}
+                              {status.isUnscheduled && (
+                                <span className="layout-tag unscheduled-tag">
+                                  📂 ยังไม่ผูกตารางงาน
                                 </span>
                               )}
                             </div>
@@ -1578,27 +1874,125 @@ export default function Admin() {
                   );
                 })}
               </div>
-              {!visible(playlists).length && (
+              {!filteredPlaylists.length && (
                 <p className="empty">
-                  ยังไม่มี Layout ในรายการ กดปุ่ม "+ สร้าง Layout ใหม่" เพื่อเริ่มต้น
+                  {scopedPlaylists.length === 0
+                    ? "ยังไม่มี Layout ในรายการ กดปุ่ม \"+ สร้าง Layout ใหม่\" เพื่อเริ่มต้น"
+                    : "ไม่พบ Layout ตามเงื่อนไขตัวกรองที่เลือก (ลองเปลี่ยนตัวกรองหรือล้างคำค้นหา)"}
                 </p>
               )}
             </>
           )}
           {tab === "schedules" && (
-            <section className="panel table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>ชื่องาน / Layout</th>
-                    <th>จอเป้าหมาย</th>
-                    <th>รอบเวลาแสดงผล</th>
-                    <th>วันหมดอายุ / สถานะ</th>
-                    <th>จัดการ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {standaloneDefaultPlaylists.map((p) => {
+            <>
+              <div className="filter-toolbar">
+                <div className="filter-controls-row">
+                  <div className="filter-inputs-group">
+                    <div className="filter-search-wrap">
+                      <Search size={16} />
+                      <input
+                        type="text"
+                        placeholder="ค้นหาตารางงาน (ชื่องาน, ผัง, จอเป้าหมาย)..."
+                        value={scheduleSearch}
+                        onChange={(e) => setScheduleSearch(e.target.value)}
+                      />
+                      {scheduleSearch && (
+                        <button
+                          type="button"
+                          className="filter-clear-btn"
+                          onClick={() => setScheduleSearch("")}
+                          aria-label="ล้างคำค้นหา"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                    {branches.length > 1 && (
+                      <select
+                        className="filter-branch-select"
+                        value={scheduleBranch}
+                        onChange={(e) => setScheduleBranch(e.target.value)}
+                        aria-label="กรองสาขา"
+                      >
+                        <option value="">ทุกสาขา ({branches.length})</option>
+                        {branches.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  <div className="filter-counter-text">
+                    แสดง {filteredStandaloneDefaults.length + filteredSchedules.length} จาก {scheduleCounts.all} งาน
+                  </div>
+                </div>
+
+                <div className="filter-chips-row">
+                  <button
+                    type="button"
+                    className={`filter-chip-btn ${scheduleFilter === "all" ? "active" : ""}`}
+                    onClick={() => setScheduleFilter("all")}
+                  >
+                    <span>ทั้งหมด</span>
+                    <span className="filter-chip-badge">{scheduleCounts.all}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-chip-btn ${scheduleFilter === "active" ? "active" : ""}`}
+                    onClick={() => setScheduleFilter("active")}
+                  >
+                    <span>🟢 กำลังเผยแพร่</span>
+                    <span className="filter-chip-badge">{scheduleCounts.active}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-chip-btn ${scheduleFilter === "upcoming" ? "active" : ""}`}
+                    onClick={() => setScheduleFilter("upcoming")}
+                  >
+                    <span>🕒 รอเริ่มตามเวลา</span>
+                    <span className="filter-chip-badge">{scheduleCounts.upcoming}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-chip-btn ${scheduleFilter === "expired" ? "active" : ""}`}
+                    onClick={() => setScheduleFilter("expired")}
+                  >
+                    <span>⛔ หมดอายุแล้ว</span>
+                    <span className="filter-chip-badge">{scheduleCounts.expired}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-chip-btn ${scheduleFilter === "default" ? "active" : ""}`}
+                    onClick={() => setScheduleFilter("default")}
+                  >
+                    <span>⭐ ผังเริ่มต้น</span>
+                    <span className="filter-chip-badge">{scheduleCounts.default}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-chip-btn ${scheduleFilter === "archived" ? "active" : ""}`}
+                    onClick={() => setScheduleFilter("archived")}
+                  >
+                    <span>📦 จัดเก็บแล้ว</span>
+                    <span className="filter-chip-badge">{scheduleCounts.archived}</span>
+                  </button>
+                </div>
+              </div>
+
+              <section className="panel table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>ชื่องาน / Layout</th>
+                      <th>จอเป้าหมาย</th>
+                      <th>รอบเวลาแสดงผล</th>
+                      <th>วันหมดอายุ / สถานะ</th>
+                      <th>จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredStandaloneDefaults.map((p) => {
                     const totalDur = (p.items || []).reduce(
                       (s: number, it: Row) => s + (Number(it.duration) || 10),
                       0,
@@ -1701,7 +2095,7 @@ export default function Admin() {
                       </tr>
                     );
                   })}
-                  {visible(schedules).map((s) => {
+                  {filteredSchedules.map((s) => {
                     const info = getScheduleInfo(s);
                     const isAllDay = s.startTime === s.endTime;
                     const isDefault = isScheduleUsingDefault(s);
@@ -1852,8 +2246,12 @@ export default function Admin() {
                   })}
                 </tbody>
               </table>
-              {!standaloneDefaultPlaylists.length && !visible(schedules).length && (
-                <p className="empty">ยังไม่มีงานในตารางแสดงผล</p>
+              {!filteredStandaloneDefaults.length && !filteredSchedules.length && (
+                <p className="empty">
+                  {scopedDefaults.length === 0 && scopedSchedules.length === 0
+                    ? "ยังไม่มีงานในตารางแสดงผล กดปุ่ม \"+ สร้าง Schedule\" เพื่อเริ่มต้น"
+                    : "ไม่พบงานในตารางตามเงื่อนไขตัวกรองที่เลือก (ลองเปลี่ยนตัวกรองหรือล้างคำค้นหา)"}
+                </p>
               )}
               <p className="muted">
                 💡 <strong>ลำดับการแสดงผล:</strong> คิวงานที่มี Schedule
@@ -1861,7 +2259,8 @@ export default function Admin() {
                 <strong>⭐ ผังเริ่มต้น (Default)</strong> อัตโนมัติโดยไม่มีวันหมดอายุ
               </p>
             </section>
-          )}
+          </>
+        )}
           {tab === "branches" && (
             <div className="cards branch-cards-grid">
               {branches.map((b) => {
