@@ -413,7 +413,7 @@ export default function Player() {
         }
 
         // Step 4: set the new current media
-        const next = { item: itemWithNorm, src: url, key: crypto.randomUUID() };
+        const next = { item: itemWithNorm, src: url, key: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15) };
         prevMedia.current = next;
         setCurrentMedia(next);
         setTransitionKey((k) => k + 1);
@@ -446,7 +446,7 @@ export default function Player() {
     if (!item || advance.current) return;
     advance.current = true;
     enqueue({
-      id: crypto.randomUUID(),
+      id: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
       media: item.media,
       count: 1,
       seconds: (Date.now() - started.current) / 1000,
