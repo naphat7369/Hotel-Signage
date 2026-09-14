@@ -411,6 +411,7 @@ p {
 .screenshot,
 .media-preview,
 .preview {
+  position: relative;
   aspect-ratio: 16/9;
   background: #0d1522;
   display: grid;
