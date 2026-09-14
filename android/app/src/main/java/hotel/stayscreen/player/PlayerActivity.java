@@ -5,6 +5,7 @@ import android.os.*;
 import android.content.SharedPreferences;
 import android.graphics.*;
 import android.media.MediaPlayer;
+import android.net.Uri;
 import android.view.*;
 import android.widget.*;
 import org.json.*;
@@ -30,6 +31,36 @@ public class PlayerActivity extends Activity {
   prefs=getSharedPreferences("player",MODE_PRIVATE);base=prefs.getString("server","");key=prefs.getString("token","");
   if(base.isEmpty()||key.isEmpty())setup();else startPlayer();
  }
+ /** Returns the directory for storing downloaded media files.
+  *  Uses external files dir (accessible to mediaserver) with fallback to internal. */
+ private File mediaDir(){
+  File ext=getExternalFilesDir(null);
+  if(ext!=null){ext.mkdirs();return ext;}
+  return getFilesDir();
+ }
+ /** Migrate any existing media files from internal to external storage (one-time). */
+ private void migrateMedia(){
+  File ext=getExternalFilesDir(null);
+  if(ext==null)return;
+  ext.mkdirs();
+  File internal=getFilesDir();
+  File[] files=internal.listFiles();
+  if(files==null)return;
+  for(File f:files){
+   if(f.getName().matches("[a-f0-9-]{36}")){
+    File dest=new File(ext,f.getName());
+    if(!dest.exists()){
+     try{Files.move(f.toPath(),dest.toPath(),StandardCopyOption.REPLACE_EXISTING);}
+     catch(Exception ignored){
+      try{Files.copy(f.toPath(),dest.toPath(),StandardCopyOption.REPLACE_EXISTING);f.delete();}
+      catch(Exception ignored2){}
+     }
+    }else{
+     f.delete();
+    }
+   }
+  }
+ }
  private void setup(){LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(60,35,60,35);box.setGravity(Gravity.CENTER);box.setBackgroundColor(Color.rgb(16,32,57));setContentView(box);
   TextView title=new TextView(this);title.setText("Shotel · ลงทะเบียนจอ");title.setTextSize(28);title.setTextColor(Color.WHITE);box.addView(title);
   EditText server=new EditText(this);server.setSingleLine(true);server.setText(base);server.setHint("https://signage.example.com");server.setTextColor(Color.WHITE);server.setHintTextColor(Color.LTGRAY);box.addView(server,new LinearLayout.LayoutParams(-1,-2));
@@ -37,6 +68,8 @@ public class PlayerActivity extends Activity {
   pair.setOnClickListener(v->{base=server.getText().toString().trim().replaceAll("/+$","");try{URI u=URI.create(base);if(!Arrays.asList("http","https").contains(u.getScheme())||u.getHost()==null)throw new Exception();}catch(Exception e){message.setText("กรุณากรอก URL เซิร์ฟเวอร์ให้ถูกต้อง");return;}pair.setEnabled(false);network.execute(()->{try{JSONObject p=api("/pair/start",new JSONObject(),false);String secret=p.getString("secret");ui.post(()->message.setText(p.optString("code")+"\nนำรหัสไปกรอกใน Manage Displays"));for(int i=0;i<200;i++){Thread.sleep(3000);JSONObject result=api("/pair/status",new JSONObject().put("secret",secret),false);if(!result.optBoolean("pending")){key=result.getString("token");prefs.edit().putString("server",base).putString("token",key).apply();ui.post(this::startPlayer);return;}}throw new Exception("รหัสหมดอายุ กรุณาลองใหม่");}catch(Exception e){ui.post(()->{message.setText(e.getMessage());pair.setEnabled(true);});}});});
  }
  private void startPlayer(){
+  // Migrate old media files from internal to external storage
+  network.execute(this::migrateMedia);
   frame=new FrameLayout(this);
   frame.setBackgroundColor(Color.BLACK);
   setContentView(frame);
@@ -65,7 +98,6 @@ public class PlayerActivity extends Activity {
    public void onSurfaceTextureUpdated(SurfaceTexture s){}
   });
   manifest=readJson("manifest.json",null);
-  
 
   tickProgram();
   network.scheduleWithFixedDelay(this::sync,0,30,TimeUnit.SECONDS);
@@ -101,7 +133,7 @@ public class PlayerActivity extends Activity {
   if(list==null||list.length()==0)return;
   index=Math.floorMod(wanted,list.length());
   item=list.optJSONObject(index);
-  File file=new File(getFilesDir(),item.optString("media"));
+  File file=new File(mediaDir(),item.optString("media"));
   if(!file.exists()){
    message.setVisibility(View.VISIBLE);
    message.setText("Cache ไม่ครบ กำลังรอดาวน์โหลดซ่อม");
@@ -170,12 +202,27 @@ public class PlayerActivity extends Activity {
       }
      }
      video=new MediaPlayer();
-     Exception firstEx=null;
+     // Try multiple methods to set data source for maximum TV box compatibility
+     boolean dataSourceSet=false;
+     // Method 1: Uri-based (best for TV boxes, uses framework content resolution)
      try{
-      file.setReadable(true, false);
-      video.setDataSource(file.getAbsolutePath());
-     }catch(Exception ex){
-      firstEx=ex;
+      video.setDataSource(PlayerActivity.this, Uri.fromFile(file));
+      dataSourceSet=true;
+     }catch(Exception ignored){}
+     // Method 2: Direct file path
+     if(!dataSourceSet){
+      try{
+       video.reset();
+       video=new MediaPlayer();
+       file.setReadable(true, false);
+       video.setDataSource(file.getAbsolutePath());
+       dataSourceSet=true;
+      }catch(Exception ignored){}
+     }
+     // Method 3: FileDescriptor
+     if(!dataSourceSet){
+      video.reset();
+      video=new MediaPlayer();
       currentFis=new FileInputStream(file);
       video.setDataSource(currentFis.getFD());
      }
@@ -234,8 +281,8 @@ public class PlayerActivity extends Activity {
  private void fitVideo(int w,int h){if(w==0||h==0)return;float tw=texture.getWidth(),th=texture.getHeight(),scale=Math.min(tw/w,th/h);Matrix m=new Matrix();m.setScale(w*scale/tw,h*scale/th,tw/2,th/2);texture.setTransform(m);}
  private void finishItem(int serial){if(serial!=generation||item==null)return;try{JSONObject p=new JSONObject().put("id",UUID.randomUUID().toString()).put("media",item.optString("media")).put("count",1).put("seconds",(System.currentTimeMillis()-began)/1000.0).put("last",System.currentTimeMillis()+offset);synchronized(this){JSONObject q=readJson("plays.json",new JSONObject());JSONArray items=q.optJSONArray("items");if(items==null)items=new JSONArray();items.put(p);q.put("items",items);writeJson("plays.json",q);}}catch(Exception ignored){}play(index+1);}
  private Map<String,JSONObject> files(JSONObject m){Map<String,JSONObject> out=new LinkedHashMap<>();if(m==null)return out;ArrayList<JSONObject> programs=new ArrayList<>();if(m.optJSONObject("fallback")!=null)programs.add(m.optJSONObject("fallback"));JSONArray ss=m.optJSONArray("schedules");for(int i=0;ss!=null&&i<ss.length();i++)programs.add(ss.optJSONObject(i).optJSONObject("snapshot"));for(JSONObject p:programs){JSONArray a=p.optJSONArray("items");for(int i=0;a!=null&&i<a.length();i++){JSONObject f=a.optJSONObject(i);out.put(f.optString("media"),f);}}return out;}
- private void sync(){try{JSONObject candidate=api("/device/manifest",null,true);offset=candidate.optLong("serverTime")-System.currentTimeMillis();Map<String,JSONObject> fs=files(candidate);int ready=0;String error="";for(JSONObject f:fs.values()){File file=new File(getFilesDir(),f.optString("media"));try{if(!file.exists()||file.length()!=f.optLong("size")||!hash(file).equals(f.optString("checksum"))){download(f,file);}ready++;}catch(Exception e){error=e.getMessage();}}
-  if(ready==fs.size()){writeJson("manifest.json",candidate);manifest=candidate;for(File f:getFilesDir().listFiles())if(f.getName().matches("[a-f0-9-]{36}")&&!fs.containsKey(f.getName()))f.delete();ui.post(()->{tickProgram();if(item==null)play(0);});}
+ private void sync(){try{JSONObject candidate=api("/device/manifest",null,true);offset=candidate.optLong("serverTime")-System.currentTimeMillis();Map<String,JSONObject> fs=files(candidate);int ready=0;String error="";File mdir=mediaDir();for(JSONObject f:fs.values()){File file=new File(mdir,f.optString("media"));try{if(!file.exists()||file.length()!=f.optLong("size")||!hash(file).equals(f.optString("checksum"))){download(f,file);}ready++;}catch(Exception e){error=e.getMessage();}}
+  if(ready==fs.size()){writeJson("manifest.json",candidate);manifest=candidate;File[] allFiles=mdir.listFiles();if(allFiles!=null)for(File f:allFiles)if(f.getName().matches("[a-f0-9-]{36}")&&!fs.containsKey(f.getName()))f.delete();ui.post(()->{tickProgram();if(item==null)play(0);});}
   String health=ready==0?"CRITICAL":ready<fs.size()?"DEGRADED":"HEALTHY";JSONObject current=new JSONObject().put("media",item==null?"":item.optString("media")).put("version",currentVersion);JSONObject hb=api("/device/heartbeat",new JSONObject().put("health",health).put("error",error).put("cache",new JSONObject().put("ready",ready).put("total",fs.size())).put("current",current).put("revision",manifest==null?"":manifest.optString("revision")).put("capabilities",new JSONObject().put("player","Android Native").put("offline",true).put("screenshot",true).put("autoStart",false)),true);
   synchronized(this){JSONObject q=readJson("plays.json",new JSONObject());if(q.optJSONArray("items")!=null&&q.optJSONArray("items").length()>0){JSONArray a=q.getJSONArray("items"),batch=new JSONArray(),remaining=new JSONArray();for(int i=0;i<a.length();i++){if(i<200)batch.put(a.get(i));else remaining.put(a.get(i));}api("/device/plays",new JSONObject().put("items",batch),true);writeJson("plays.json",new JSONObject().put("items",remaining));}}
   if(hb.optBoolean("screenshotRequested")||System.currentTimeMillis()-lastShot>300000)ui.post(this::capture);
