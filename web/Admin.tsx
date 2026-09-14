@@ -24,6 +24,8 @@ import {
   Search,
   Check,
   Edit3,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { api, size, when } from "./api";
 import { selectProgram } from "../shared/schedule.mjs";
@@ -86,6 +88,99 @@ function Badge({ d }: { d: Row }) {
       <span className="status-dot" />
       <span>{label}</span>
     </span>
+  );
+}
+function ToastNotification({
+  message,
+  type = "notice",
+  onClose,
+  duration = 3500,
+}: {
+  message: string;
+  type?: "notice" | "error";
+  onClose: () => void;
+  duration?: number;
+}) {
+  const [isExiting, setIsExiting] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const timerRef = useRef<any>(null);
+  const startTimeRef = useRef(Date.now());
+  const remainingRef = useRef(duration);
+
+  const startTimer = () => {
+    startTimeRef.current = Date.now();
+    timerRef.current = setTimeout(() => {
+      triggerDismiss();
+    }, remainingRef.current);
+  };
+
+  const clearTimer = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const triggerDismiss = () => {
+    clearTimer();
+    setIsExiting(true);
+    setTimeout(() => {
+      onClose();
+    }, 300);
+  };
+
+  useEffect(() => {
+    setIsExiting(false);
+    remainingRef.current = duration;
+    startTimer();
+    return () => clearTimer();
+  }, [message]);
+
+  const handleMouseEnter = () => {
+    clearTimer();
+    const elapsed = Date.now() - startTimeRef.current;
+    remainingRef.current = Math.max(500, remainingRef.current - elapsed);
+    setIsPaused(true);
+  };
+
+  const handleMouseLeave = () => {
+    setIsPaused(false);
+    startTimer();
+  };
+
+  if (!message) return null;
+  const isNotice = type === "notice";
+
+  return (
+    <div
+      className={`toast-banner ${isNotice ? "toast-notice" : "toast-error"} ${isExiting ? "toast-exit" : "toast-enter"}`}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      role={isNotice ? "status" : "alert"}
+    >
+      <div className="toast-icon">
+        {isNotice ? (
+          <CheckCircle2 size={19} className="toast-icon-svg" />
+        ) : (
+          <AlertCircle size={19} className="toast-icon-svg" />
+        )}
+      </div>
+      <div className="toast-body">
+        <span className="toast-message">{message}</span>
+      </div>
+      <button
+        type="button"
+        className="toast-close-btn"
+        aria-label="ปิดข้อความ"
+        onClick={triggerDismiss}
+      >
+        <X size={15} />
+      </button>
+      <div
+        className={`toast-progress-bar ${isPaused ? "paused" : ""}`}
+        style={{ animationDuration: `${duration}ms` }}
+      />
+    </div>
   );
 }
 function getScheduleInfo(s: Row) {
@@ -916,22 +1011,27 @@ export default function Admin() {
                 )}
             </div>
           </div>
-          {error && (
-            <div className="error" role="alert">
-              {error}
-              <button aria-label="ปิดข้อความ" onClick={() => setError("")}>
-                ×
-              </button>
-            </div>
-          )}
-          {notice && (
-            <div className="notice" role="status">
-              {notice}
-              <button aria-label="ปิดข้อความ" onClick={() => setNotice("")}>
-                ×
-              </button>
-            </div>
-          )}
+          {/* Floating Toast Notification with Slide-Away Animations */}
+          <div className="toast-container" aria-live="polite">
+            {notice && (
+              <ToastNotification
+                key={"notice-" + notice}
+                message={notice}
+                type="notice"
+                duration={3500}
+                onClose={() => setNotice("")}
+              />
+            )}
+            {error && (
+              <ToastNotification
+                key={"error-" + error}
+                message={error}
+                type="error"
+                duration={6000}
+                onClose={() => setError("")}
+              />
+            )}
+          </div>
           {tab === "overview" && (
             <>
               <div className="stats">
