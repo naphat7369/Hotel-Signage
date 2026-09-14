@@ -46,6 +46,7 @@ next-env.d.ts
 /outputs/
 /work/
 /data/
+/data_backup/
 /release/
 /android/.gradle/
 /android/**/build/
