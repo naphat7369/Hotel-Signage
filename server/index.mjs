@@ -1079,6 +1079,12 @@ async function handler(req, res) {
           audit(u, verb, r);
           return send(res, 200, r);
         }
+        if (kind === "displays" && verb === "delete") {
+          run("DELETE FROM device_keys WHERE device=?", id);
+          run("DELETE FROM entities WHERE id=?", id);
+          audit(u, "delete-display", e);
+          return send(res, 200, { ok: true });
+        }
         if (kind === "displays" && verb === "edit") {
           let fallback = e.fallback;
           if (b.fallback !== undefined) {

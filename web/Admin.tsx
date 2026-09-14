@@ -1562,6 +1562,19 @@ export default function Admin() {
                           <Play size={16} fill="currentColor" />
                           <span>ดูภาพตัวอย่างสด (Preview)</span>
                         </button>
+                        <button
+                          className="btn-layout-delete"
+                          disabled={busy}
+                          onClick={() => {
+                            if (confirm(`คุณต้องการลบจอ "${d.name}" ออกจากระบบอย่างถาวร ใช่หรือไม่?`)) {
+                              act(`/displays/${d.id}/delete`);
+                            }
+                          }}
+                          title="ลบจอนี้"
+                          style={{ marginLeft: "auto", background: "transparent", border: "none", color: "#e11d48", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500 }}
+                        >
+                          <Trash2 size={16} /> เลิกจับคู่ / ลบจอ
+                        </button>
                       </div>
                     </article>
                   );
