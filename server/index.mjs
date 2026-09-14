@@ -960,8 +960,9 @@ async function handler(req, res) {
               transitionSpeed: Number(i.transitionSpeed) || 0.8,
               ...(() => {
                 const m = entity(i.media);
+                const isVid = m.type?.startsWith("video") || m.name?.toLowerCase().endsWith(".mp4");
                 return {
-                  type: m.type,
+                  type: m.type || (isVid ? "video/mp4" : "image/jpeg"),
                   checksum: m.checksum,
                   size: m.size,
                   name: m.name,

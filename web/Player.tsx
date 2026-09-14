@@ -368,14 +368,16 @@ export default function Player() {
           await c.delete(cacheKey(f.media));
           throw new Error("ไฟล์เสีย กำลังรอซ่อม " + f.name);
         }
-        const mimeType = f.type || (f.name?.endsWith(".mp4") ? "video/mp4" : "");
+        const isVid = f.type?.startsWith("video") || f.name?.toLowerCase().endsWith(".mp4");
+        const mimeType = f.type || (isVid ? "video/mp4" : "");
         const blob = rawBlob.type ? rawBlob : (mimeType ? new Blob([rawBlob], { type: mimeType }) : rawBlob);
         url = URL.createObjectURL(blob);
         if (canceled) {
           URL.revokeObjectURL(url);
           return;
         }
-        setItem(f);
+        const itemWithNorm = { ...f, type: f.type || (isVid ? "video/mp4" : f.type) };
+        setItem(itemWithNorm);
         setSrc(url);
         started.current = Date.now();
         setCurrentMedia((prev) => {
@@ -392,7 +394,7 @@ export default function Player() {
               });
             }, speed + 100);
           }
-          return { item: f, src: url, key: crypto.randomUUID() };
+          return { item: itemWithNorm, src: url, key: crypto.randomUUID() };
         });
       })
       .catch((e) => {
@@ -415,22 +417,23 @@ export default function Player() {
     }).catch((e) => setError("บันทึกยอดไม่สำเร็จ: " + e.message));
     setIndex((i) => i + 1);
   }
+  const isCurrentVideo = item?.type?.startsWith("video") || item?.name?.toLowerCase().endsWith(".mp4");
   useEffect(() => {
-    if (!item || item.type.startsWith("video") || !src) return;
-    const t = setTimeout(complete, item.duration * 1000);
+    if (!item || isCurrentVideo || !src) return;
+    const t = setTimeout(complete, (Number(item.duration) || 10) * 1000);
     return () => clearTimeout(t);
-  }, [item, src]);
+  }, [item, src, isCurrentVideo]);
   useEffect(() => {
-    if (!item?.type.startsWith("video")) return;
+    if (!isCurrentVideo) return;
     const watchdog = setTimeout(
       () => {
-        setError("วิดีโอเล่นไม่จบ ข้ามไปสื่อถัดไป");
+        setError("วิดีโอค้างหรือเล่นไม่จบ ข้ามไปสื่อถัดไป");
         setIndex((i) => i + 1);
       },
-      Math.max(3600000, (item.duration + 60) * 1000),
+      3600000,
     );
     return () => clearTimeout(watchdog);
-  }, [item]);
+  }, [item, isCurrentVideo]);
   if (!credential)
     return (
       <main className="player-setup">
@@ -470,7 +473,7 @@ export default function Player() {
                 } as React.CSSProperties
               }
             >
-              {outgoingMedia.item.type?.startsWith("video") ? (
+              {outgoingMedia.item.type?.startsWith("video") || outgoingMedia.item.name?.toLowerCase().endsWith(".mp4") ? (
                 <video src={outgoingMedia.src} muted autoPlay playsInline />
               ) : (
                 <img src={outgoingMedia.src} alt="" />
@@ -486,7 +489,7 @@ export default function Player() {
               } as React.CSSProperties
             }
           >
-            {currentMedia.item.type?.startsWith("video") ? (
+            {currentMedia.item.type?.startsWith("video") || currentMedia.item.name?.toLowerCase().endsWith(".mp4") ? (
               <video
                 ref={(e) => {
                   media.current = e;

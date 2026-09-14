@@ -251,24 +251,34 @@ function getScheduleInfo(s: Row) {
 
 function PreviewModal({
   items,
+  media = [],
   onClose,
 }: {
   items: Row[];
+  media?: Row[];
   onClose: () => void;
 }) {
   const [index, setIndex] = useState(0);
   const [outgoing, setOutgoing] = useState<{ item: Row; key: string } | null>(null);
   const [animKey, setAnimKey] = useState(0);
 
+  const isVideoItem = (it?: Row | null) => {
+    if (!it) return false;
+    if (it.type?.startsWith("video")) return true;
+    if (it.name?.toLowerCase().endsWith(".mp4")) return true;
+    const found = media.find((x) => x.id === it.media);
+    return !!(found?.type?.startsWith("video") || found?.name?.toLowerCase().endsWith(".mp4"));
+  };
+
   // Preload all preview images so transitions are instant
   useEffect(() => {
     items.forEach((it) => {
-      if (!it.type?.startsWith("video") && it.media) {
+      if (!isVideoItem(it) && it.media) {
         const img = new Image();
         img.src = "/api/media/" + it.media + "/file";
       }
     });
-  }, [items]);
+  }, [items, media]);
 
   const goTo = (nextIdx: number) => {
     if (!items.length) return;
@@ -294,34 +304,36 @@ function PreviewModal({
   }, [outgoing, index, items]);
 
   useEffect(() => {
-    if (!items.length || items[index]?.type?.startsWith("video")) return;
+    const cur = items[index];
+    if (!items.length || isVideoItem(cur)) return;
     const t = setTimeout(
       () => goTo(index + 1),
-      (Number(items[index]?.duration) || 10) * 1000,
+      (Number(cur?.duration) || 10) * 1000,
     );
     return () => clearTimeout(t);
-  }, [index, items]);
+  }, [index, items, media]);
 
   const m = items[index];
   const transitionEffect = m?.transition || "fade";
   const transitionSpeed = Number(m?.transitionSpeed) || 0.8;
+  const isCurVideo = isVideoItem(m);
 
   return (
     <Modal title="Preview Layout (ตัวอย่างการแสดงผล)" onClose={onClose}>
       {m ? (
         <>
-          <div className="preview preview-stage">
+          <div className="preview-canvas">
             {outgoing && (
               <div
                 key={outgoing.key}
-                className={`slide-layer anim-outgoing transition-${transitionEffect}`}
+                className={`slide-layer anim-outgoing transition-${outgoing.item.transition || transitionEffect}`}
                 style={
                   {
                     "--transition-speed": `${transitionSpeed}s`,
                   } as React.CSSProperties
                 }
               >
-                {outgoing.item.type?.startsWith("video") ? (
+                {isVideoItem(outgoing.item) ? (
                   <video
                     src={"/api/media/" + outgoing.item.media + "/file"}
                     muted
@@ -345,7 +357,7 @@ function PreviewModal({
                 } as React.CSSProperties
               }
             >
-              {m.type?.startsWith("video") ? (
+              {isCurVideo ? (
                 <video
                   src={"/api/media/" + m.media + "/file"}
                   autoPlay
@@ -363,7 +375,13 @@ function PreviewModal({
             </div>
           </div>
           <p style={{ marginTop: 10 }}>
-            <strong>หน้า {index + 1}/{items.length}</strong> · {m.name} · {m.duration} วินาที · เอฟเฟค: <strong>{transitionEffect}</strong> ({transitionSpeed}s)
+            <strong>หน้า {index + 1}/{items.length}</strong> · {m.name} ·{" "}
+            {isCurVideo ? (
+              <span style={{ color: "#166534", fontWeight: 600 }}>🎬 วิดีโอ (เล่นตามความยาวไฟล์จนจบ)</span>
+            ) : (
+              <span>{m.duration || 10} วินาที</span>
+            )}{" "}
+            · เอฟเฟค: <strong>{transitionEffect}</strong> ({transitionSpeed}s)
           </p>
           <div
             className="actions row"
@@ -1758,7 +1776,7 @@ export default function Admin() {
                         <div className="layout-pages-list">
                           {(p.items || []).slice(0, 5).map((i: Row, n: number) => {
                             const m = media.find((item) => item.id === i.media);
-                            const isVideo = m?.type?.startsWith("video");
+                            const isVideo = m?.type?.startsWith("video") || m?.name?.toLowerCase().endsWith(".mp4");
                             return (
                               <div className="layout-page-row" key={n}>
                                 <div className="page-row-main">
@@ -1775,7 +1793,7 @@ export default function Admin() {
                                 </div>
                                 <div className="page-row-timing">
                                   <span className="page-timing-pill">
-                                    {i.duration}s ·{" "}
+                                    {isVideo ? "🎬 ตามคลิป" : `${i.duration}s`} ·{" "}
                                     {i.transition || p.defaultTransition || "fade"}{" "}
                                     ({i.transitionSpeed ||
                                       p.defaultTransitionSpeed ||
@@ -2178,12 +2196,10 @@ export default function Admin() {
                         <td>
                           <div className="actions wrap">
                             <button
-                              onClick={() =>
-                                setPreview(
-                                  versions.find((v) => v.id === s.version)
-                                    ?.items || [],
-                                )
-                              }
+                              onClick={() => {
+                                const ver = versions.find((v) => v.id === s.version);
+                                setPreview(ver ? vItems(ver) : []);
+                              }}
                               title="ดูตัวอย่างการแสดงผล"
                             >
                               <Play size={13} /> Preview
@@ -2758,7 +2774,7 @@ export default function Admin() {
                 <div className="layout-pages-editor-list">
                   {items.map((i, n) => {
                     const m = media.find((item) => item.id === i.media);
-                    const isVideo = m?.type?.startsWith("video");
+                    const isVideo = m?.type?.startsWith("video") || m?.name?.toLowerCase().endsWith(".mp4");
                     return (
                       <div className="layout-page-card" key={n}>
                         <div className="layout-page-left">
@@ -2816,29 +2832,38 @@ export default function Admin() {
                         </div>
 
                         <div className="layout-page-controls-grid">
-                          <label className="page-control-item" title="ระยะเวลาแสดงผลหน้านี้ (วินาที)">
-                            <span className="control-label">เวลา</span>
-                            <div className="input-with-unit">
-                              <input
-                                aria-label={"ระยะเวลาหน้า " + (n + 1)}
-                                type="number"
-                                min={1}
-                                max={3600}
-                                className="input-duration"
-                                value={i.duration || defaultDuration}
-                                onChange={(e) =>
-                                  setItems((v) =>
-                                    v.map((it, k) =>
-                                      k === n
-                                        ? { ...it, duration: Number(e.target.value) }
-                                        : it,
-                                    ),
-                                  )
-                                }
-                              />
-                              <span className="unit-label">วิ</span>
+                          {isVideo ? (
+                            <div className="page-control-item" title="วิดีโอจะเล่นตามความยาวไฟล์อัตโนมัติจนจบ">
+                              <span className="control-label">การเล่น</span>
+                              <div className="video-duration-badge">
+                                🎬 เล่นตามความยาวคลิป (จนจบ)
+                              </div>
                             </div>
-                          </label>
+                          ) : (
+                            <label className="page-control-item" title="ระยะเวลาแสดงผลหน้านี้ (วินาที)">
+                              <span className="control-label">เวลา</span>
+                              <div className="input-with-unit">
+                                <input
+                                  aria-label={"ระยะเวลาหน้า " + (n + 1)}
+                                  type="number"
+                                  min={1}
+                                  max={3600}
+                                  className="input-duration"
+                                  value={i.duration || defaultDuration}
+                                  onChange={(e) =>
+                                    setItems((v) =>
+                                      v.map((it, k) =>
+                                        k === n
+                                          ? { ...it, duration: Number(e.target.value) }
+                                          : it,
+                                      ),
+                                    )
+                                  }
+                                />
+                                <span className="unit-label">วิ</span>
+                              </div>
+                            </label>
+                          )}
 
                           <label className="page-control-item" title="เอฟเฟกต์เปลี่ยนหน้า">
                             <span className="control-label">เอฟเฟกต์</span>
@@ -3485,7 +3510,7 @@ export default function Admin() {
                   fallback: versions.find((v) => v.id === detail.fallback),
                 };
                 const p = selectProgram(m, new Date(String(b.at)));
-                setPreview(p?.items || []);
+                setPreview(p ? vItems(p) : []);
                 setModal("");
               }}
             >
@@ -3611,7 +3636,13 @@ export default function Admin() {
           )}
         </Modal>
       )}
-      {preview && <PreviewModal items={preview} onClose={() => setPreview(null)} />}
+      {preview && (
+        <PreviewModal
+          items={preview}
+          media={media}
+          onClose={() => setPreview(null)}
+        />
+      )}
     </div>
   );
 }
