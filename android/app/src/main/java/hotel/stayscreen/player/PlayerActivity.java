@@ -25,7 +25,7 @@ public class PlayerActivity extends Activity {
  private volatile JSONObject manifest; private JSONObject item,program; private int index=0,generation=0;
  private String base,key,currentVersion=""; private long offset=0,began=0,lastShot=0; private boolean resumed=false;
  private Bitmap imageBitmap; private Runnable advance, pendingVideo; private long lastVideoPosition=-1; private int stalled=0;
-
+ private FileInputStream currentFis;
  @Override public void onCreate(Bundle state){super.onCreate(state);getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);getWindow().getDecorView().setSystemUiVisibility(5894);
   prefs=getSharedPreferences("player",MODE_PRIVATE);base=prefs.getString("server","");key=prefs.getString("token","");
   if(base.isEmpty()||key.isEmpty())setup();else startPlayer();
@@ -65,6 +65,26 @@ public class PlayerActivity extends Activity {
    public void onSurfaceTextureUpdated(SurfaceTexture s){}
   });
   manifest=readJson("manifest.json",null);
+  
+  Button unregisterBtn = new Button(this);
+  unregisterBtn.setText("ลบจอ (Unregister)");
+  unregisterBtn.setBackgroundColor(Color.parseColor("#AA000000"));
+  unregisterBtn.setTextColor(Color.WHITE);
+  unregisterBtn.setFocusable(true);
+  FrameLayout.LayoutParams p = new FrameLayout.LayoutParams(-2,-2);
+  p.gravity = Gravity.TOP | Gravity.RIGHT;
+  p.setMargins(30,30,30,30);
+  frame.addView(unregisterBtn, p);
+  unregisterBtn.setOnClickListener(v -> {
+      prefs.edit().remove("token").apply();
+      key="";
+      manifest=null;
+      new File(getFilesDir(),"manifest.json").delete();
+      stopMedia();
+      finish();
+      startActivity(getIntent());
+  });
+
   tickProgram();
   network.scheduleWithFixedDelay(this::sync,0,30,TimeUnit.SECONDS);
   ui.postDelayed(this::clockTick,1000);
@@ -90,6 +110,7 @@ public class PlayerActivity extends Activity {
   item=null;
   lastVideoPosition=-1;
   stalled=0;
+  if(currentFis!=null){try{currentFis.close();}catch(Exception ignored){}currentFis=null;}
  }
  private void play(int wanted){
   stopMedia();
@@ -167,12 +188,13 @@ public class PlayerActivity extends Activity {
       }
      }
      video=new MediaPlayer();
+     Exception firstEx=null;
      try{
       video.setDataSource(file.getAbsolutePath());
      }catch(Exception ex){
-      try(FileInputStream fis=new FileInputStream(file)){
-       video.setDataSource(fis.getFD(),0,file.length());
-      }
+      firstEx=ex;
+      currentFis=new FileInputStream(file);
+      video.setDataSource(currentFis.getFD(),0,file.length());
      }
      video.setSurface(surface);
      video.setVolume(0,0);
