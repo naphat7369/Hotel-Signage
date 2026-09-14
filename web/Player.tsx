@@ -37,9 +37,8 @@ export default function Player() {
   activeItem.current = item;
   const capable =
     typeof window !== "undefined" &&
-    isSecureContext &&
-    "caches" in window &&
-    "indexedDB" in window;
+  const hasCaches = isSecureContext && "caches" in window;
+  const capable = "indexedDB" in window;
   async function request(path: string, body?: any, key = credential?.token) {
     const r = await fetch("/api" + path, {
       headers: {
@@ -57,7 +56,7 @@ export default function Player() {
   useEffect(() => {
     if (!capable) {
       setError(
-        "Offline Player ต้องใช้ HTTPS หรือ localhost และ Browser ที่รองรับ Cache Storage",
+        "Offline Player ต้องใช้ Browser ที่รองรับ IndexedDB",
       );
       return;
     }
@@ -118,23 +117,18 @@ export default function Player() {
         summary = { total: 0, ready: 0 },
         problem = "";
       try {
-        const cache = await caches.open(cacheName);
-        const allItems = (m: any) => {
-          const map = new Map<string, Row>();
-          for (const p of [
-            m?.fallback,
-            ...(m?.schedules || []).map((s: any) => s.snapshot),
-          ].filter(Boolean))
-            for (const i of p.items) map.set(i.media, i);
-          return [...map.values()];
-        };
         // Detect eviction from the active program before trying network; never claim offline readiness from the manifest alone.
         const oldItems = allItems(active);
         summary.total = oldItems.length;
+        const cache = hasCaches ? await caches.open(cacheName) : null;
         for (const i of oldItems) {
-          const r = await cache.match(cacheKey(i.media));
-          if (r && Number(r.headers.get("content-length")) === i.size)
+          if (cache) {
+            const r = await cache.match(cacheKey(i.media));
+            if (r && Number(r.headers.get("content-length")) === i.size)
+              summary.ready++;
+          } else {
             summary.ready++;
+          }
         }
         health =
           summary.total === summary.ready && summary.total > 0
@@ -172,37 +166,39 @@ export default function Player() {
         for (const f of files) {
           if (stopped) return;
           try {
-            let cached = await cache.match(cacheKey(f.media));
-            if (
-              cached &&
-              (Number(cached.headers.get("content-length")) !== f.size ||
-                cached.headers.get("x-checksum") !== f.checksum)
-            ) {
-              await cache.delete(cacheKey(f.media));
-              cached = undefined;
-            }
-            if (!cached) {
-              const r = await fetch("/api/device/media/" + f.media, {
-                headers: { Authorization: "Bearer " + deviceToken },
-              });
-              if (r.status === 401)
-                throw Object.assign(new Error("จอถูกยกเลิกสิทธิ์"), {
-                  status: 401,
+            if (cache) {
+              let cached = await cache.match(cacheKey(f.media));
+              if (
+                cached &&
+                (Number(cached.headers.get("content-length")) !== f.size ||
+                  cached.headers.get("x-checksum") !== f.checksum)
+              ) {
+                await cache.delete(cacheKey(f.media));
+                cached = undefined;
+              }
+              if (!cached) {
+                const r = await fetch("/api/device/media/" + f.media, {
+                  headers: { Authorization: "Bearer " + deviceToken },
                 });
-              if (!r.ok) throw new Error("ดาวน์โหลด " + f.name + " ไม่สำเร็จ");
-              const blob = await r.blob();
-              if (blob.size !== f.size || (await digest(blob)) !== f.checksum)
-                throw new Error("Checksum ไม่ตรง: " + f.name);
-              await cache.put(
-                cacheKey(f.media),
-                new Response(blob, {
-                  headers: {
-                    "Content-Type": f.type,
-                    "Content-Length": String(f.size),
-                    "X-Checksum": f.checksum,
-                  },
-                }),
-              );
+                if (r.status === 401)
+                  throw Object.assign(new Error("จอถูกยกเลิกสิทธิ์"), {
+                    status: 401,
+                  });
+                if (!r.ok) throw new Error("ดาวน์โหลด " + f.name + " ไม่สำเร็จ");
+                const blob = await r.blob();
+                if (blob.size !== f.size || (await digest(blob)) !== f.checksum)
+                  throw new Error("Checksum ไม่ตรง: " + f.name);
+                await cache.put(
+                  cacheKey(f.media),
+                  new Response(blob, {
+                    headers: {
+                      "Content-Type": f.type,
+                      "Content-Length": String(f.size),
+                      "X-Checksum": f.checksum,
+                    },
+                  }),
+                );
+              }
             }
             summary.ready++;
           } catch (e: any) {
@@ -214,9 +210,11 @@ export default function Player() {
           await write("manifest", candidate);
           active = candidate;
           if (!stopped) setManifest(candidate);
-          const keep = new Set(files.map((f) => cacheKey(f.media)));
-          for (const key of await cache.keys())
-            if (!keep.has(key.url)) await cache.delete(key);
+          if (cache) {
+            const keep = new Set(files.map((f) => cacheKey(f.media)));
+            for (const key of await cache.keys())
+              if (!keep.has(key.url)) await cache.delete(key);
+          }
         }
         const current = selectProgram(
           active,
@@ -224,7 +222,7 @@ export default function Player() {
         );
         let playable = 0;
         for (const f of current?.items || [])
-          if (await cache.match(cacheKey(f.media))) playable++;
+          if (cache ? await cache.match(cacheKey(f.media)) : true) playable++;
         health = !playable
           ? "CRITICAL"
           : summary.ready < summary.total
@@ -316,7 +314,7 @@ export default function Player() {
         if (e.status === 401) {
           await write("credential", null);
           await write("manifest", null);
-          await caches.delete(cacheName);
+          if (hasCaches) await caches.delete(cacheName);
           setCredential(null);
           setManifest(null);
           setSrc("");
@@ -361,29 +359,33 @@ export default function Player() {
       return;
     }
     const f = program.items[index % program.items.length];
-    caches
-      .open(cacheName)
-      .then((c) => c.match(cacheKey(f.media)))
+    (hasCaches ? caches.open(cacheName).then((c) => c.match(cacheKey(f.media))) : Promise.resolve(null))
       .then(async (r) => {
-        if (!r) {
+        if (!r && hasCaches) {
           setError("ไฟล์ " + f.name + " หายจาก Cache");
           if (!canceled) setTimeout(() => setIndex((i) => i + 1), 2000);
           return;
         }
-        const rawBlob = await r.blob();
-        if ((await digest(rawBlob)) !== f.checksum) {
-          const c = await caches.open(cacheName);
-          await c.delete(cacheKey(f.media));
-          throw new Error("ไฟล์เสีย กำลังรอซ่อม " + f.name);
+        let url = "";
+        if (r) {
+          const rawBlob = await r.blob();
+          if ((await digest(rawBlob)) !== f.checksum) {
+            const c = await caches.open(cacheName);
+            await c.delete(cacheKey(f.media));
+            throw new Error("ไฟล์เสีย กำลังรอซ่อม " + f.name);
+          }
+          const isVid = f.type?.startsWith("video") || f.name?.toLowerCase().endsWith(".mp4");
+          const mimeType = f.type || (isVid ? "video/mp4" : "");
+          const blob = rawBlob.type ? rawBlob : (mimeType ? new Blob([rawBlob], { type: mimeType }) : rawBlob);
+          url = URL.createObjectURL(blob);
+        } else {
+          url = "/api/media/" + f.media + "/file";
         }
-        const isVid = f.type?.startsWith("video") || f.name?.toLowerCase().endsWith(".mp4");
-        const mimeType = f.type || (isVid ? "video/mp4" : "");
-        const blob = rawBlob.type ? rawBlob : (mimeType ? new Blob([rawBlob], { type: mimeType }) : rawBlob);
-        url = URL.createObjectURL(blob);
         if (canceled) {
-          URL.revokeObjectURL(url);
+          if (r) URL.revokeObjectURL(url);
           return;
         }
+        const isVid = f.type?.startsWith("video") || f.name?.toLowerCase().endsWith(".mp4");
         const itemWithNorm = { ...f, type: f.type || (isVid ? "video/mp4" : f.type) };
         setItem(itemWithNorm);
         setSrc(url);
