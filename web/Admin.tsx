@@ -322,7 +322,7 @@ function PreviewModal({
     <Modal title="Preview Layout (ตัวอย่างการแสดงผล)" onClose={onClose}>
       {m ? (
         <>
-          <div className="preview-canvas">
+          <div className="preview preview-stage" style={{ marginBottom: 16, border: "1px solid #1e293b" }}>
             {outgoing && (
               <div
                 key={outgoing.key}
