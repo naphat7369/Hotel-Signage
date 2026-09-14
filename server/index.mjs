@@ -22,8 +22,6 @@ import {
 } from "node:fs";
 import { resolve, dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Transform } from "node:stream";
-import { pipeline } from "node:stream/promises";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const home = resolve(process.env.DATA_DIR || join(root, "data"));
@@ -326,34 +324,108 @@ function mediaRefs(id) {
     "SELECT id,data FROM entities WHERE kind IN ('playlists','versions')",
   ).filter((r) => JSON.parse(r.data).items?.some((i) => i.media === id));
 }
-async function receiveFile(req, path, max) {
-  let size = 0,
-    head = Buffer.alloc(0);
+async function receiveFile(req, path, max, declared = 0) {
+  let size = 0;
+  let head = Buffer.alloc(0);
   const hash = createHash("sha256");
-  try {
-    await pipeline(
-      req,
-      new Transform({
-        transform(c, enc, cb) {
-          size += c.length;
-          if (size > max)
-            return cb(
-              Object.assign(new Error("ไฟล์ใหญ่เกินขนาดที่อนุญาต"), {
-                status: 413,
-              }),
-            );
-          if (head.length < 32) head = Buffer.concat([head, c]).subarray(0, 32);
-          hash.update(c);
-          cb(null, c);
-        },
-      }),
-      createWriteStream(path, { flags: "wx" }),
-    );
-    return { size, head, checksum: hash.digest("hex") };
-  } catch (e) {
-    if (existsSync(path)) unlinkSync(path);
-    throw e;
-  }
+  const ws = createWriteStream(path, { flags: "w" });
+
+  logInfo("RECEIVE_START", req, { path, declared, max });
+
+  return new Promise((resolve, reject) => {
+    let finished = false;
+    let lastChunkTime = Date.now();
+
+    const watchdog = setInterval(() => {
+      if (finished) return;
+      if (Date.now() - lastChunkTime > 30000) {
+        clearInterval(watchdog);
+        const err = Object.assign(
+          new Error(
+            `การส่งไฟล์ขาดการเชื่อมต่อนานเกินไป (Stalled: ได้รับ ${size}/${declared} bytes, ค้างนานเกิน 30s)`,
+          ),
+          { status: 408 },
+        );
+        logError("RECEIVE_WATCHDOG_TIMEOUT", req, err, { path, size, declared });
+        cleanup(err);
+      }
+    }, 5000);
+    watchdog.unref();
+
+    function cleanup(err) {
+      if (finished) return;
+      finished = true;
+      clearInterval(watchdog);
+      try {
+        ws.destroy();
+      } catch {}
+      if (existsSync(path)) {
+        try {
+          unlinkSync(path);
+        } catch {}
+      }
+      reject(err);
+    }
+
+    ws.on("error", (err) => {
+      logError("WRITE_STREAM_ERROR", req, err, { path, size, declared });
+      cleanup(err);
+    });
+
+    req.on("error", (err) => {
+      logError("REQ_STREAM_ERROR", req, err, { path, size, declared });
+      cleanup(err);
+    });
+
+    req.on("close", () => {
+      if (!finished && !req.complete && declared > 0 && size < declared) {
+        const err = Object.assign(
+          new Error(
+            `การเชื่อมต่อถูกตัดก่อนส่งไฟล์เสร็จ (Client disconnected: ได้รับ ${size}/${declared} bytes)`,
+          ),
+          { status: 499 },
+        );
+        logError("REQ_CLOSED_PREMATURELY", req, err, {
+          path,
+          size,
+          declared,
+        });
+        cleanup(err);
+      }
+    });
+
+    req.on("data", (chunk) => {
+      lastChunkTime = Date.now();
+      size += chunk.length;
+      if (size > max) {
+        return cleanup(
+          Object.assign(new Error("ไฟล์ใหญ่เกินขนาดที่อนุญาต"), {
+            status: 413,
+          }),
+        );
+      }
+      if (head.length < 32) {
+        head = Buffer.concat([head, chunk]).subarray(0, 32);
+      }
+      hash.update(chunk);
+
+      if (!ws.write(chunk)) {
+        req.pause();
+        ws.once("drain", () => req.resume());
+      }
+    });
+
+    req.on("end", () => {
+      clearInterval(watchdog);
+      ws.end((err) => {
+        if (err) return cleanup(err);
+        if (finished) return;
+        finished = true;
+        logInfo("RECEIVE_FINISH", req, { path, size, declared });
+        resolve({ size, head, checksum: hash.digest("hex") });
+      });
+    });
+  });
 }
 function signature(h) {
   if (h.length >= 2 && h[0] === 0xff && h[1] === 0xd8)
@@ -780,7 +852,7 @@ async function handler(req, res) {
 
         let f;
         try {
-          f = await receiveFile(req, temp, max);
+          f = await receiveFile(req, temp, max, declared);
         } catch (streamErr) {
           logError("UPLOAD_STREAM_FAILED", req, streamErr, { temp, declared, name });
           throw streamErr;

@@ -656,14 +656,26 @@ export default function Admin() {
     console.log(`[Upload] Starting file upload: "${file.name}" (${file.size} bytes, type: ${file.type || "unknown"}) to branch: ${activeBranch}`);
     return new Promise<Row>((ok, no) => {
       const x = new XMLHttpRequest();
+      x.timeout = 120000;
       x.open(
         "POST",
         `/api/media?org=${org}&branch=${activeBranch}&name=${encodeURIComponent(file.name)}`,
       );
-      x.upload.onprogress = (e) =>
-        setProgress(
-          e.lengthComputable ? Math.round((e.loaded / e.total) * 100) : 0,
-        );
+      x.upload.onprogress = (e) => {
+        const pct = e.lengthComputable ? Math.round((e.loaded / e.total) * 100) : 0;
+        setProgress(pct);
+        if (pct % 25 === 0 || pct === 100) {
+          console.log(`[Upload Progress] "${file.name}": ${pct}% (${e.loaded}/${e.total} bytes)`);
+        }
+      };
+      x.ontimeout = () => {
+        console.error("[Upload Timeout]", file.name);
+        no(new Error(`อัปโหลด "${file.name}" หมดเวลา (Timeout 120s): เซิร์ฟเวอร์ไม่ตอบสนอง กรุณาตรวจสอบการเชื่อมต่อหรือลองใหม่อีกครั้ง`));
+      };
+      x.onabort = () => {
+        console.warn("[Upload Aborted]", file.name);
+        no(new Error(`การอัปโหลด "${file.name}" ถูกยกเลิก`));
+      };
       x.onerror = (ev) => {
         console.error("[Upload Network Error]", file.name, ev);
         no(new Error(`อัปโหลด "${file.name}" ไม่สำเร็จ: การเชื่อมต่อเครือข่ายขัดข้อง (Network Error / Connection Reset)`));
