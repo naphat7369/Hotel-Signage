@@ -971,10 +971,35 @@ async function handler(req, res) {
             publishedAt: now(),
           });
           put(kind, e.org, e.branch, { ...e, published: v.id }, id);
-          if (e.isDefault && e.branch) {
+          if (e.branch) {
             const br = entity(e.branch, "branches");
-            put("branches", br.org, br.id, { ...br, fallback: v.id }, br.id);
+            let shouldUpdateFallback = !!e.isDefault;
+            if (!shouldUpdateFallback && br.fallback) {
+              try {
+                const fb = entity(br.fallback, "versions");
+                if (fb.playlist === id) shouldUpdateFallback = true;
+              } catch {}
+            }
+            if (!br.fallback) shouldUpdateFallback = true;
+            if (shouldUpdateFallback) {
+              put("branches", br.org, br.id, { ...br, fallback: v.id }, br.id);
+            }
           }
+          const relatedSchedules = all(
+            "SELECT id FROM entities WHERE kind='schedules' AND org=?",
+            e.org,
+          )
+            .map((r) => entity(r.id))
+            .filter((s) => s.playlist === id);
+          for (const s of relatedSchedules) {
+            put("schedules", s.org, s.branch, { ...s, version: v.id }, s.id);
+          }
+          logInfo("PLAYLIST_PUBLISHED", req, {
+            id,
+            name: e.name,
+            version: v.id,
+            updatedSchedules: relatedSchedules.length,
+          });
           audit(u, verb, v);
           return send(res, 201, v);
         }

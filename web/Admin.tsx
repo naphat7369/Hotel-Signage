@@ -1519,27 +1519,6 @@ export default function Admin() {
                         )}
                       </div>
 
-                      {/* Version Accordion */}
-                      {versions
-                        .filter((v) => v.playlist === p.id)
-                        .map((v) => (
-                          <details className="layout-version-details" key={v.id}>
-                            <summary>
-                              <Clock size={13} />
-                              <span>เวอร์ชันเผยแพร่: {when(v.publishedAt)}</span>
-                            </summary>
-                            <div className="version-drawer">
-                              <button
-                                type="button"
-                                className="btn-view-published"
-                                onClick={() => setPreview(v.items)}
-                              >
-                                <Play size={12} fill="currentColor" /> ดู Published Version ({v.items?.length || 0} หน้า)
-                              </button>
-                            </div>
-                          </details>
-                        ))}
-
                       {/* Card Footer Actions */}
                       <div className="layout-card-footer">
                         <div className="layout-main-actions">

@@ -56,3 +56,4 @@ next-env.d.ts
 /android/gradle/
 /android/gradlew*
 .vscode/
+local.properties
