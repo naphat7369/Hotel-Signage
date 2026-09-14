@@ -21,6 +21,7 @@ export default function Player() {
     [src, setSrc] = useState(""),
     [currentMedia, setCurrentMedia] = useState<{ item: Row; src: string; key: string } | null>(null),
     [outgoingMedia, setOutgoingMedia] = useState<{ item: Row; src: string; key: string } | null>(null),
+    [transitionKey, setTransitionKey] = useState(0),
     [index, setIndex] = useState(0),
     [clock, setClock] = useState(Date.now()),
     [controls, setControls] = useState(false);
@@ -30,7 +31,9 @@ export default function Player() {
     lastShot = useRef(0),
     started = useRef(0),
     offset = useRef(0),
-    advance = useRef(false);
+    advance = useRef(false),
+    prevMedia = useRef<{ item: Row; src: string; key: string } | null>(null),
+    outgoingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   activeItem.current = item;
   const capable =
     typeof window !== "undefined" &&
@@ -348,6 +351,11 @@ export default function Player() {
     if (!program?.items.length) {
       setCurrentMedia(null);
       setOutgoingMedia(null);
+      prevMedia.current = null;
+      if (outgoingTimer.current) {
+        clearTimeout(outgoingTimer.current);
+        outgoingTimer.current = null;
+      }
       setItem(null);
       setSrc("");
       return;
@@ -380,22 +388,42 @@ export default function Player() {
         setItem(itemWithNorm);
         setSrc(url);
         started.current = Date.now();
-        setCurrentMedia((prev) => {
-          if (prev) {
-            setOutgoingMedia(prev);
-            const speed = (Number(f.transitionSpeed) || 0.8) * 1000;
-            setTimeout(() => {
-              setOutgoingMedia((out) => {
-                if (out && out.src === prev.src) {
-                  URL.revokeObjectURL(out.src);
-                  return null;
-                }
-                return out;
-              });
-            }, speed + 100);
-          }
-          return { item: itemWithNorm, src: url, key: crypto.randomUUID() };
-        });
+
+        // Step 1: capture previous media BEFORE setting current
+        const prevSnapshot = prevMedia.current;
+
+        // Step 2: clear any pending outgoing cleanup
+        if (outgoingTimer.current) {
+          clearTimeout(outgoingTimer.current);
+          outgoingTimer.current = null;
+        }
+
+        // Step 3: set outgoing first (if there was a previous)
+        if (prevSnapshot) {
+          setOutgoingMedia(prevSnapshot);
+        }
+
+        // Step 4: set the new current media
+        const next = { item: itemWithNorm, src: url, key: crypto.randomUUID() };
+        prevMedia.current = next;
+        setCurrentMedia(next);
+        setTransitionKey((k) => k + 1);
+
+        // Step 5: remove outgoing layer after animation completes
+        if (prevSnapshot) {
+          const speed = (Number(f.transitionSpeed) || 0.8) * 1000;
+          const capturedSrc = prevSnapshot.src;
+          outgoingTimer.current = setTimeout(() => {
+            setOutgoingMedia((out) => {
+              if (out && out.src === capturedSrc) {
+                URL.revokeObjectURL(capturedSrc);
+                return null;
+              }
+              return out;
+            });
+            outgoingTimer.current = null;
+          }, speed + 200);
+        }
       })
       .catch((e) => {
         setError(e.message);
@@ -466,10 +494,10 @@ export default function Player() {
           {outgoingMedia && (
             <div
               key={outgoingMedia.key}
-              className={`slide-layer anim-outgoing transition-${currentMedia.item.transition || "fade"}`}
+              className={`slide-layer anim-outgoing transition-${outgoingMedia.item.transition || currentMedia.item.transition || "fade"}`}
               style={
                 {
-                  "--transition-speed": `${currentMedia.item.transitionSpeed || 0.8}s`,
+                  "--transition-speed": `${outgoingMedia.item.transitionSpeed || currentMedia.item.transitionSpeed || 0.8}s`,
                 } as React.CSSProperties
               }
             >
