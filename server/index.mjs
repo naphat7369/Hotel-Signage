@@ -1089,6 +1089,64 @@ async function handler(req, res) {
           audit(u, "delete-schedule", e);
           return send(res, 200, { ok: true });
         }
+        if (kind === "branches" && verb === "delete") {
+          admin(u);
+          const allBranches = rows(u, "branches", e.org);
+          if (allBranches.length <= 1) {
+            fail(400, "ไม่สามารถลบได้ เนื่องจากองค์กรต้องมีสาขาอย่างน้อย 1 สาขา");
+          }
+          const displays = rows(u, "displays", e.org).filter(
+            (d) => d.branch === id,
+          );
+          if (displays.length > 0) {
+            fail(
+              409,
+              `ไม่สามารถลบสาขาได้เนื่องจากยังมีจอแสดงผล ${displays.length} จอที่ผูกอยู่กับสาขานี้ (กรุณาลบหรือย้ายจอก่อน)`,
+            );
+          }
+          const schedules = rows(u, "schedules", e.org).filter(
+            (s) => s.branch === id,
+          );
+          if (schedules.length > 0) {
+            fail(
+              409,
+              `ไม่สามารถลบสาขาได้เนื่องจากยังมี Schedule ${schedules.length} รายการในสาขานี้`,
+            );
+          }
+          const playlists = rows(u, "playlists", e.org).filter(
+            (p) => p.branch === id,
+          );
+          if (playlists.length > 0) {
+            fail(
+              409,
+              `ไม่สามารถลบสาขาได้เนื่องจากยังมี Layout/Playlist ${playlists.length} รายการในสาขานี้`,
+            );
+          }
+          const branchMedia = rows(u, "media", e.org).filter(
+            (m) => m.branch === id,
+          );
+          if (branchMedia.length > 0) {
+            fail(
+              409,
+              `ไม่สามารถลบสาขาได้เนื่องจากยังมีไฟล์สื่อ ${branchMedia.length} ไฟล์ในสาขานี้`,
+            );
+          }
+          const branchUsers = all(
+            "SELECT id, name FROM users WHERE branch=? AND org=?",
+            id,
+            e.org,
+          );
+          if (branchUsers.length > 0) {
+            fail(
+              409,
+              `ไม่สามารถลบสาขาได้เนื่องจากมีผู้ใช้งาน ${branchUsers.length} คนผูกอยู่กับสาขานี้`,
+            );
+          }
+          run("DELETE FROM entities WHERE id=?", id);
+          audit(u, "delete-branch", e);
+          logInfo("DELETE_BRANCH", req, { id, name: e.name, org: e.org });
+          return send(res, 200, { ok: true });
+        }
         fail(400, "ไม่รองรับคำสั่งนี้");
       }
       if (req.method === "POST") {

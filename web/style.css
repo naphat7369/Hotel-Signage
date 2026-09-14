@@ -2929,3 +2929,162 @@ progress {
     font-size: 44px;
   }
 }
+
+/* Branch Cards */
+.branch-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.panel.branch-card {
+  background: #ffffff;
+  border: 1px solid #dce4ec;
+  border-radius: 14px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 1px 4px rgba(16, 32, 57, 0.04);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  margin: 0;
+}
+
+.panel.branch-card:hover {
+  transform: translateY(-2px);
+  border-color: #80cbc4;
+  box-shadow: 0 8px 24px rgba(0, 137, 125, 0.09);
+}
+
+.branch-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.branch-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.branch-icon-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: #e0f2f1;
+  color: #00897b;
+}
+
+.branch-title-group {
+  min-width: 0;
+}
+
+.branch-name {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a2533;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.branch-tz-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.branch-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  background: #f8fafc;
+  border: 1px solid #e8eef3;
+  border-radius: 10px;
+  padding: 12px 8px;
+  margin: 12px 0 18px 0;
+  text-align: center;
+}
+
+.branch-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.branch-stat-icon {
+  margin-bottom: 2px;
+}
+
+.branch-stat-icon.text-teal {
+  color: #00897b;
+}
+
+.branch-stat-icon.text-indigo {
+  color: #4f46e5;
+}
+
+.branch-stat-icon.text-amber {
+  color: #d97706;
+}
+
+.branch-stat-val {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.branch-stat-lbl {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.branch-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid #edf2f7;
+}
+
+.branch-primary-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #00897b;
+  background: #e0f2f1;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.branch-del-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.branch-del-btn:hover {
+  background: #fef2f2;
+  border-color: #ef4444;
+  color: #b91c1c;
+  transform: translateY(-1px);
+}
+

@@ -765,6 +765,52 @@ export default function Admin() {
     }, "อัปโหลดและเลือกสื่อเรียบร้อย");
     if (pickerFileRef.current) pickerFileRef.current.value = "";
   }
+  async function handleDeleteBranch(b: Row) {
+    if (branches.length <= 1) {
+      setError("ไม่สามารถลบได้ เนื่องจากองค์กรต้องมีสาขาอย่างน้อย 1 สาขา");
+      return;
+    }
+    const branchDisplays = displays.filter((d) => d.branch === b.id);
+    const branchPlaylists = playlists.filter((p) => p.branch === b.id);
+    const branchSchedules = schedules.filter((s) => s.branch === b.id);
+    const branchMedia = ((data.media as Row[]) || []).filter((m) => m.branch === b.id);
+
+    if (
+      branchDisplays.length > 0 ||
+      branchPlaylists.length > 0 ||
+      branchSchedules.length > 0 ||
+      branchMedia.length > 0
+    ) {
+      const details = [
+        branchDisplays.length > 0 ? `${branchDisplays.length} จอ` : "",
+        branchPlaylists.length > 0 ? `${branchPlaylists.length} ผัง` : "",
+        branchSchedules.length > 0 ? `${branchSchedules.length} ตาราง` : "",
+        branchMedia.length > 0 ? `${branchMedia.length} ไฟล์สื่อ` : "",
+      ]
+        .filter(Boolean)
+        .join(", ");
+      setError(
+        `ไม่สามารถลบสาขา "${b.name}" ได้เนื่องจากยังมีข้อมูลผูกอยู่ (${details}) กรุณาลบหรือย้ายข้อมูลก่อน`,
+      );
+      return;
+    }
+
+    if (
+      !confirm(
+        `คุณแน่ใจหรือไม่ว่าต้องการลบสาขา "${b.name}"? การดำเนินการนี้ไม่สามารถเรียกคืนได้`,
+      )
+    ) {
+      return;
+    }
+
+    await work(async () => {
+      await api(`/branches/${b.id}/delete`, {}, org);
+      if (formBranch === b.id) {
+        const remaining = branches.filter((item) => item.id !== b.id);
+        setFormBranch(remaining[0]?.id || "");
+      }
+    }, `ลบสาขา "${b.name}" เรียบร้อย`);
+  }
   async function saveLayout(
     e: React.MouseEvent | React.FormEvent,
     publishNow = false,
@@ -1838,17 +1884,72 @@ export default function Admin() {
             </section>
           )}
           {tab === "branches" && (
-            <div className="cards">
-              {branches.map((b) => (
-                <article className="panel" key={b.id}>
-                  <Building2 />
-                  <h2>{b.name}</h2>
-                  <p>{b.timezone}</p>
-                  <p>
-                    {displays.filter((d) => d.branch === b.id).length} Displays
-                  </p>
-                </article>
-              ))}
+            <div className="cards branch-cards-grid">
+              {branches.map((b) => {
+                const branchDisplays = displays.filter((d) => d.branch === b.id);
+                const branchPlaylists = playlists.filter((p) => p.branch === b.id);
+                const branchSchedules = schedules.filter((s) => s.branch === b.id);
+                const isOnlyBranch = branches.length <= 1;
+
+                return (
+                  <article className="panel branch-card" key={b.id}>
+                    <div className="branch-card-header">
+                      <div className="branch-identity">
+                        <div className="branch-icon-avatar">
+                          <Building2 size={22} />
+                        </div>
+                        <div className="branch-title-group">
+                          <h2 className="branch-name">{b.name}</h2>
+                          <span className="badge gray branch-tz-badge">
+                            {b.timezone || "Asia/Bangkok"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="branch-stats-grid">
+                      <div className="branch-stat-item">
+                        <Monitor size={15} className="branch-stat-icon text-teal" />
+                        <span className="branch-stat-val">{branchDisplays.length}</span>
+                        <span className="branch-stat-lbl">จอแสดงผล</span>
+                      </div>
+                      <div className="branch-stat-item">
+                        <ListVideo size={15} className="branch-stat-icon text-indigo" />
+                        <span className="branch-stat-val">{branchPlaylists.length}</span>
+                        <span className="branch-stat-lbl">Layout / ผัง</span>
+                      </div>
+                      <div className="branch-stat-item">
+                        <CalendarDays size={15} className="branch-stat-icon text-amber" />
+                        <span className="branch-stat-val">{branchSchedules.length}</span>
+                        <span className="branch-stat-lbl">ตารางเวลา</span>
+                      </div>
+                    </div>
+
+                    {user.role !== "branch" && (
+                      <div className="branch-card-footer">
+                        {isOnlyBranch ? (
+                          <span
+                            className="branch-primary-badge"
+                            title="สาขาหลักขององค์กร ต้องมีอย่างน้อย 1 สาขา"
+                          >
+                            ⭐ สาขาหลัก
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="branch-del-btn"
+                            disabled={busy}
+                            onClick={() => handleDeleteBranch(b)}
+                            title={`ลบสาขา ${b.name}`}
+                          >
+                            <Trash2 size={14} /> ลบสาขา
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
             </div>
           )}
           {tab === "users" && (
