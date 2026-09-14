@@ -1335,28 +1335,7 @@ export default function Admin() {
               </section>
             </>
           )}
-          {["layouts", "schedules"].includes(tab) && (
-            <div className="filters">
-              <input
-                aria-label="ค้นหา"
-                placeholder="ค้นหาชื่อ…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-              <select
-                aria-label="กรองสาขา"
-                value={branch}
-                onChange={(e) => setBranch(e.target.value)}
-              >
-                <option value="">ทุกสาขา</option>
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+
           {tab === "displays" && (
             <>
               <div className="fleet-summary">
