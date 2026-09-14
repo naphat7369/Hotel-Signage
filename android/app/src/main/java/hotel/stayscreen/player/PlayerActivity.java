@@ -66,24 +66,6 @@ public class PlayerActivity extends Activity {
   });
   manifest=readJson("manifest.json",null);
   
-  Button unregisterBtn = new Button(this);
-  unregisterBtn.setText("ลบจอ (Unregister)");
-  unregisterBtn.setBackgroundColor(Color.parseColor("#AA000000"));
-  unregisterBtn.setTextColor(Color.WHITE);
-  unregisterBtn.setFocusable(true);
-  FrameLayout.LayoutParams p = new FrameLayout.LayoutParams(-2,-2);
-  p.gravity = Gravity.TOP | Gravity.RIGHT;
-  p.setMargins(30,30,30,30);
-  frame.addView(unregisterBtn, p);
-  unregisterBtn.setOnClickListener(v -> {
-      prefs.edit().remove("token").apply();
-      key="";
-      manifest=null;
-      new File(getFilesDir(),"manifest.json").delete();
-      stopMedia();
-      finish();
-      startActivity(getIntent());
-  });
 
   tickProgram();
   network.scheduleWithFixedDelay(this::sync,0,30,TimeUnit.SECONDS);
@@ -190,11 +172,12 @@ public class PlayerActivity extends Activity {
      video=new MediaPlayer();
      Exception firstEx=null;
      try{
+      file.setReadable(true, false);
       video.setDataSource(file.getAbsolutePath());
      }catch(Exception ex){
       firstEx=ex;
       currentFis=new FileInputStream(file);
-      video.setDataSource(currentFis.getFD(),0,file.length());
+      video.setDataSource(currentFis.getFD());
      }
      video.setSurface(surface);
      video.setVolume(0,0);
