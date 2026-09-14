@@ -11,16 +11,20 @@ let base,
   cookie = "";
 async function start() {
   child = spawn(process.execPath, ["server/index.mjs"], {
-    env: { ...process.env, PORT: "0", HOST: "127.0.0.1", DATA_DIR: data },
+    env: { ...process.env, PORT: "0", HOST: "127.0.0.1", DATA_DIR: data, NODE_ENV: "test" },
     stdio: ["ignore", "pipe", "pipe"],
   });
   base = await new Promise((ok, no) => {
+    let stderr = "";
+    child.stderr.on("data", (b) => {
+      stderr += b.toString();
+    });
     child.stdout.on("data", (b) => {
       const m = b.toString().match(/http:\/\/127.0.0.1:\d+/);
       if (m) ok(m[0]);
     });
     child.on("error", no);
-    child.on("exit", (c) => no(new Error("server exit " + c)));
+    child.on("exit", (c) => no(new Error("server exit " + c + "\nStderr: " + stderr)));
   });
 }
 async function call(path, body, options = {}) {

@@ -10,6 +10,7 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import {
+  appendFileSync,
   createReadStream,
   createWriteStream,
   existsSync,
@@ -44,6 +45,44 @@ const str = (v, max = 200) => {
   return v.trim();
 };
 const now = () => Date.now();
+
+export function logError(tag, req, err, extra = null) {
+  const timestamp = new Date().toISOString();
+  const method = req?.method || "";
+  const url = req?.url || "";
+  const ip = req?.headers?.["x-forwarded-for"] || req?.socket?.remoteAddress || "unknown";
+  const status = err?.status || (err?.code ? err.code : 500);
+  const msg = err?.message || String(err);
+  const extraStr = extra ? ` | Details: ${typeof extra === "object" ? JSON.stringify(extra) : extra}` : "";
+  const stackStr = err?.stack ? `\nStack: ${err.stack}` : "";
+  const line = `[${timestamp}] [ERROR] [${tag}] [Status: ${status}] ${method} ${url} (IP: ${ip})${extraStr} - ${msg}${stackStr}\n`;
+
+  console.error(line.trimEnd());
+  try {
+    appendFileSync(join(home, "error.log"), line, "utf8");
+  } catch (fsErr) {
+    console.error("[LOGGER_WRITE_FAILED] Could not write to error.log:", fsErr);
+  }
+}
+
+export function logInfo(tag, reqOrMsg, extra = null) {
+  const timestamp = new Date().toISOString();
+  let line;
+  if (typeof reqOrMsg === "object" && reqOrMsg?.method) {
+    const req = reqOrMsg;
+    const ip = req.headers?.["x-forwarded-for"] || req.socket?.remoteAddress || "unknown";
+    const extraStr = extra ? ` | Details: ${typeof extra === "object" ? JSON.stringify(extra) : extra}` : "";
+    line = `[${timestamp}] [INFO] [${tag}] ${req.method} ${req.url} (IP: ${ip})${extraStr}\n`;
+  } else {
+    const msg = String(reqOrMsg);
+    const extraStr = extra ? ` | Details: ${typeof extra === "object" ? JSON.stringify(extra) : extra}` : "";
+    line = `[${timestamp}] [INFO] [${tag}] ${msg}${extraStr}\n`;
+  }
+  console.log(line.trimEnd());
+  try {
+    appendFileSync(join(home, "error.log"), line, "utf8");
+  } catch {}
+}
 function tx(fn) {
   db.exec("BEGIN IMMEDIATE");
   try {
@@ -165,7 +204,9 @@ function seedAdminIfEmpty() {
     }
   }
 }
-seedAdminIfEmpty();
+if (process.env.NODE_ENV !== "test") {
+  seedAdminIfEmpty();
+}
 function user(req) {
   const sid = (req.headers.cookie || "")
     .split(";")
@@ -326,7 +367,9 @@ function signature(h) {
     return "image/webp";
   if (h.includes(Buffer.from("ftyp")) || h.toString("ascii", 4, 8) === "ftyp")
     return "video/mp4";
-  fail(400, "รองรับ JPEG, PNG, WebP และ MP4 เท่านั้น");
+  const hex = h.subarray(0, 16).toString("hex");
+  const ascii = h.subarray(0, 16).toString("ascii").replace(/[^\x20-\x7E]/g, ".");
+  fail(400, `รูปแบบไฟล์ไม่ถูกต้อง (Header: hex=[${hex}], ascii=[${ascii}]) — รองรับเฉพาะ JPEG, PNG, WebP และ MP4`);
 }
 function stream(res, req, path, type) {
   if (!existsSync(path)) fail(404, "ไม่พบไฟล์");
@@ -668,6 +711,17 @@ async function handler(req, res) {
             u.branch,
           ),
         });
+      if (path === "/api/logs" && req.method === "GET") {
+        admin(u);
+        const logPath = join(home, "error.log");
+        if (!existsSync(logPath)) {
+          return send(res, 200, { lines: [], file: logPath });
+        }
+        const limit = Math.min(Math.max(Number(url.searchParams.get("limit")) || 100, 1), 1000);
+        const content = readFileSync(logPath, "utf8");
+        const lines = content.trim().split("\n").filter(Boolean).slice(-limit);
+        return send(res, 200, { lines, total: lines.length, file: logPath });
+      }
       if (path === "/api/users" && req.method === "POST") {
         admin(u);
         const b = await json(req);
@@ -700,11 +754,38 @@ async function handler(req, res) {
           0,
         );
         const max = Math.min(500 * 1024 ** 2, organization.quota - used);
-        if (max <= 0 || declared > max)
-          fail(413, "พื้นที่เต็มหรือไฟล์เกิน 500 MB");
+
+        logInfo("UPLOAD_START", req, {
+          user: u.email,
+          userId: u.id,
+          name,
+          branch,
+          org,
+          declaredSize: declared,
+          usedQuota: used,
+          totalQuota: organization.quota,
+          maxAllowed: max,
+        });
+
+        if (max <= 0 || declared > max) {
+          const reason = max <= 0
+            ? `พื้นที่องค์กรเต็ม (ใช้ไปแล้ว ${used} จาก ${organization.quota} bytes)`
+            : `ขนาดไฟล์ (${declared} bytes) เกินพื้นที่คงเหลือ (${max} bytes) หรือเกินขนาดสูงสุด 500 MB`;
+          logError("UPLOAD_QUOTA_EXCEEDED", req, new Error(reason), { declared, max, used, quota: organization.quota });
+          fail(413, reason);
+        }
+
         const id = randomUUID(),
           temp = join(home, "media", id + ".tmp");
-        const f = await receiveFile(req, temp, max);
+
+        let f;
+        try {
+          f = await receiveFile(req, temp, max);
+        } catch (streamErr) {
+          logError("UPLOAD_STREAM_FAILED", req, streamErr, { temp, declared, name });
+          throw streamErr;
+        }
+
         try {
           const type = signature(f.head);
           tx(() => {
@@ -713,7 +794,7 @@ async function handler(req, res) {
               0,
             );
             if (current + f.size > organization.quota)
-              fail(413, "พื้นที่องค์กรเต็ม");
+              fail(413, `พื้นที่องค์กรเต็ม (โควตา ${organization.quota} bytes, ปัจจุบันใช้ ${current} bytes, ไฟล์ใหม่ ${f.size} bytes)`);
             put(
               "media",
               org,
@@ -730,10 +811,14 @@ async function handler(req, res) {
           });
           renameSync(temp, join(home, "media", id));
           audit(u, "upload-media", { id, org, branch });
+          logInfo("UPLOAD_SUCCESS", req, { id, name, type, size: f.size, checksum: f.checksum });
           return send(res, 201, entity(id));
         } catch (e) {
-          if (existsSync(temp)) unlinkSync(temp);
+          if (existsSync(temp)) {
+            try { unlinkSync(temp); } catch {}
+          }
           run("DELETE FROM entities WHERE id=?", id);
+          logError("UPLOAD_PROCESSING_ERROR", req, e, { id, name, branch, temp, headHex: f?.head?.toString("hex") });
           throw e;
         }
       }
@@ -1168,9 +1253,12 @@ async function handler(req, res) {
       res.destroy();
       return;
     }
-    if (!e.status) console.error(e);
-    send(res, e.status || 500, {
-      error: e.status ? e.message : "เซิร์ฟเวอร์ไม่สามารถทำรายการได้",
+    logError("HTTP_REQUEST_ERROR", req, e);
+    const status = e.status || 500;
+    send(res, status, {
+      error: e.message || "เซิร์ฟเวอร์ไม่สามารถทำรายการได้",
+      code: e.code,
+      status,
     });
   }
 }

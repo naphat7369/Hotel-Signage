@@ -315,10 +315,24 @@ export default function Admin() {
     [statusFilter, setStatusFilter] = useState("all"),
     [mediaPickerMode, setMediaPickerMode] = useState<"add" | number | null>(null),
     [pickerSearch, setPickerSearch] = useState(""),
-    [pickerType, setPickerType] = useState<"all" | "image" | "video">("all");
+    [pickerType, setPickerType] = useState<"all" | "image" | "video">("all"),
+    [systemLogs, setSystemLogs] = useState<string[]>([]);
   const lastOrg = useRef("");
   const playlistFileRef = useRef<HTMLInputElement>(null);
   const pickerFileRef = useRef<HTMLInputElement>(null);
+  async function loadLogs() {
+    try {
+      setBusy(true);
+      const res = await api("/logs", undefined, org);
+      setSystemLogs(res.lines || []);
+      setModal("systemLogs");
+    } catch (e: any) {
+      console.error("[Logs Error]", e);
+      setError("ไม่สามารถดึงบันทึก Log ได้: " + e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function refresh(selected = org) {
     const d = await api("/state", undefined, selected);
     if (lastOrg.current !== selected) return;
@@ -544,6 +558,7 @@ export default function Admin() {
     const activeBranch = formBranch || (data.branches as Row[])?.[0]?.id;
     if (!activeBranch) throw new Error("ไม่พบสาขาในระบบ กรุณาสร้างสาขาก่อน");
     if (!formBranch) setFormBranch(activeBranch);
+    console.log(`[Upload] Starting file upload: "${file.name}" (${file.size} bytes, type: ${file.type || "unknown"}) to branch: ${activeBranch}`);
     return new Promise<Row>((ok, no) => {
       const x = new XMLHttpRequest();
       x.open(
@@ -554,20 +569,26 @@ export default function Admin() {
         setProgress(
           e.lengthComputable ? Math.round((e.loaded / e.total) * 100) : 0,
         );
-      x.onerror = () => no(new Error("อัปโหลดไม่สำเร็จ (กรุณาตรวจสอบการเชื่อมต่อเครือข่าย)"));
+      x.onerror = (ev) => {
+        console.error("[Upload Network Error]", file.name, ev);
+        no(new Error(`อัปโหลด "${file.name}" ไม่สำเร็จ: การเชื่อมต่อเครือข่ายขัดข้อง (Network Error / Connection Reset)`));
+      };
       x.onload = () => {
         if (x.status < 300) {
           try {
-            ok(JSON.parse(x.responseText));
+            const res = JSON.parse(x.responseText);
+            console.log(`[Upload Success] "${file.name}" -> ID: ${res.id}`);
+            ok(res);
           } catch {
             ok({ id: "" });
           }
         } else {
+          console.error(`[Upload Error] HTTP ${x.status} for "${file.name}":`, x.responseText);
           try {
             const err = JSON.parse(x.responseText);
-            no(new Error(err.error || `อัปโหลดไม่สำเร็จ (${x.status})`));
+            no(new Error(err.error || `อัปโหลด "${file.name}" ไม่สำเร็จ (${x.status})`));
           } catch {
-            no(new Error(`อัปโหลดไม่สำเร็จ (${x.status})`));
+            no(new Error(`อัปโหลด "${file.name}" ไม่สำเร็จ (${x.status}): ${x.responseText || "ข้อผิดพลาดที่ไม่ทราบสาเหตุ"}`));
           }
         }
       };
@@ -1810,8 +1831,25 @@ export default function Admin() {
                 Backup: ใช้คำสั่ง npm run backup
                 และนำโฟลเดอร์สำรองไปเก็บในอุปกรณ์อีกชุดหนึ่ง
               </p>
+              <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+                <h3 style={{ margin: "0 0 8px", display: "flex", alignItems: "center", gap: 8 }}>
+                  <Clock size={18} /> บันทึกระบบ & Error Logs
+                </h3>
+                <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.9rem" }}>
+                  ดูประวัติข้อผิดพลาดและการทำงานของเซิร์ฟเวอร์แบบเรียลไทม์ (บันทึกใน <code>data/error.log</code>)
+                </p>
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={loadLogs}
+                  disabled={busy}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                >
+                  <Clock size={15} /> ดูบันทึกระบบ & Error Logs ล่าสุด
+                </button>
+              </div>
               {user.role === "platform" && (
-                <button onClick={() => open("organizations")}>
+                <button onClick={() => open("organizations")} style={{ marginTop: 16 }}>
                   เพิ่มองค์กร
                 </button>
               )}
@@ -1834,6 +1872,7 @@ export default function Admin() {
                 editDisplay: "ตั้งค่าจอ",
                 schedulePreview: "จำลองการแสดงตามเวลา",
                 viewScreenshot: "ภาพหน้าจอ: " + (detail?.name || ""),
+                systemLogs: "บันทึกระบบ & Error Logs (data/error.log)",
               } as Row
             )[modal]
           }
@@ -2946,6 +2985,53 @@ export default function Admin() {
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+          {modal === "systemLogs" && (
+            <div className="system-logs-modal" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                <span className="muted" style={{ fontSize: "0.85rem" }}>
+                  แสดงรายการล่าสุดจาก <code>data/error.log</code> บนเซิร์ฟเวอร์
+                </span>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={loadLogs}
+                    disabled={busy}
+                    style={{ fontSize: "0.85rem", padding: "4px 10px" }}
+                  >
+                    🔄 รีเฟรช Log
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(systemLogs.join("\n"));
+                      setNotice("คัดลอก Log ทั้งหมดลงคลิปบอร์ดแล้ว");
+                    }}
+                    style={{ fontSize: "0.85rem", padding: "4px 10px" }}
+                  >
+                    📋 คัดลอก Log
+                  </button>
+                </div>
+              </div>
+              <pre
+                style={{
+                  background: "#0f172a",
+                  color: "#e2e8f0",
+                  padding: 14,
+                  borderRadius: 8,
+                  maxHeight: 450,
+                  overflowY: "auto",
+                  fontSize: "0.8rem",
+                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-all",
+                  lineHeight: 1.5,
+                  margin: 0,
+                }}
+              >
+                {systemLogs.length ? systemLogs.join("\n") : "ยังไม่มีข้อมูลบันทึกข้อผิดพลาดในระบบ (ระบบทำงานปกติ)"}
+              </pre>
             </div>
           )}
           {error && (
