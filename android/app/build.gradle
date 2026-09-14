@@ -2,7 +2,7 @@
 android {
  namespace 'hotel.stayscreen.player'
  compileSdk 34
- defaultConfig { applicationId 'hotel.stayscreen.player'; minSdk 21; targetSdk 34; versionCode 3; versionName '0.3.0' }
+ defaultConfig { applicationId 'hotel.stayscreen.player'; minSdk 26; targetSdk 34; versionCode 4; versionName '0.4.0' }
  signingConfigs {
   debug {
    v1SigningEnabled true
