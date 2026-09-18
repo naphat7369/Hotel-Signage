@@ -1452,6 +1452,7 @@ export default function Admin() {
                             <div className="display-meta-tags">
                               <span className="display-tag branch-tag">{lookup(branches, d.branch)}</span>
                               <span className="display-tag group-tag">{d.group || "ไม่มีกลุ่ม"}</span>
+                              <span className="display-tag" style={{background: '#f1f5f9', color: '#64748b', fontFamily: 'monospace'}}>ID: {d.id}</span>
                             </div>
                           </div>
                         </div>
@@ -2668,30 +2669,7 @@ export default function Admin() {
               </button>
             </form>
           )}
-          {modal === "editDisplay" && detail && (
-            <form onSubmit={submit((b) => api(`/displays/${detail.id}/edit`, b, org))}>
-              <label>
-                ชื่อจอ
-                <input name="name" required defaultValue={detail.name} />
-              </label>
-              {branchField()}
-              <button className="primary" disabled={busy}>
-                บันทึกการแก้ไข
-              </button>
-            </form>
-          )}
-          {modal === "editDisplay" && detail && (
-            <form onSubmit={submit((b) => api(`/displays/${detail.id}/edit`, b, org))}>
-              <label>
-                ชื่อจอ
-                <input name="name" required defaultValue={detail.name} />
-              </label>
-              {branchField()}
-              <button className="primary" disabled={busy}>
-                บันทึกการแก้ไข
-              </button>
-            </form>
-          )}
+
           {(modal === "layouts" || modal === "playlists") && (
             <form onSubmit={(e) => saveLayout(e, false, false)}>
               <div className="two form-grid-2">
@@ -3544,9 +3522,14 @@ export default function Admin() {
               )}
             >
               <label>
+                รหัสหน้าจอ (ID)
+                <input value={detail.id} disabled style={{ fontFamily: 'monospace', background: '#f8fafc' }} />
+              </label>
+              <label>
                 ชื่อจอ
                 <input name="name" required defaultValue={detail.name} />
               </label>
+              {branchField()}
               <label>
                 กลุ่ม
                 <input name="group" defaultValue={detail.group} />
