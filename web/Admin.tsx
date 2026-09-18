@@ -817,7 +817,7 @@ export default function Admin() {
       (pickerType === "image" && !isVid);
     return matchQuery && matchType;
   });
-  function act(path: string, b: Row | undefined = undefined, method?: string) {
+  function act(path: string, b: Row = {}, method: string = "POST") {
     work(() => api(path, b, org, method)).catch(() => {});
   }
   function branchField() {
