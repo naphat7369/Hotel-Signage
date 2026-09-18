@@ -24,7 +24,8 @@ export default function Player() {
     [transitionKey, setTransitionKey] = useState(0),
     [index, setIndex] = useState(0),
     [clock, setClock] = useState(Date.now()),
-    [controls, setControls] = useState(false);
+    [controls, setControls] = useState(false),
+    [showIdentify, setShowIdentify] = useState(false);
   const media = useRef<HTMLImageElement | HTMLVideoElement | null>(null),
     activeItem = useRef<Row | null>(null),
     activeVersion = useRef(""),
@@ -69,8 +70,24 @@ export default function Player() {
       })
       .catch((e) => setError("อ่านข้อมูล Player ไม่สำเร็จ: " + e.message));
     const t = setInterval(() => setClock(Date.now()), 1000);
-    return () => clearInterval(t);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") setShowIdentify(true);
+      if (e.key === "ArrowRight" || e.key === "Escape") setShowIdentify(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("keydown", onKey);
+    };
   }, []);
+  
+  useEffect(() => {
+    if (showIdentify) {
+      const timer = setTimeout(() => setShowIdentify(false), 15000);
+      return () => clearTimeout(timer);
+    }
+  }, [showIdentify]);
+  
   async function beginPair() {
     try {
       setError("");
@@ -498,6 +515,50 @@ export default function Player() {
     );
   return (
     <main className="player" onDoubleClick={() => setControls((v) => !v)}>
+      <div
+        className="controls-trigger"
+        onClick={() => setControls(!controls)}
+      />
+      {showIdentify && (
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            bottom: 0,
+            width: "350px",
+            backgroundColor: "rgba(0,0,0,0.85)",
+            color: "white",
+            zIndex: 9999,
+            padding: "2rem",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            boxSizing: "border-box",
+            borderRight: "2px solid #00897d",
+            animation: "slideInLeft 0.3s ease-out",
+          }}
+        >
+          <style>{`
+            @keyframes slideInLeft {
+              from { transform: translateX(-100%); }
+              to { transform: translateX(0); }
+            }
+          `}</style>
+          <h2 style={{ fontSize: "2rem", marginBottom: "1rem", color: "#00897d" }}>ข้อมูลจอแสดงผล</h2>
+          <div style={{ marginBottom: "1.5rem" }}>
+            <div style={{ fontSize: "1rem", color: "#94a3b8" }}>ชื่อจอ (Name)</div>
+            <div style={{ fontSize: "1.5rem", fontWeight: "bold" }}>{manifest?.name || "ไม่ทราบชื่อ"}</div>
+          </div>
+          <div style={{ marginBottom: "1.5rem" }}>
+            <div style={{ fontSize: "1rem", color: "#94a3b8" }}>รหัสอุปกรณ์ (ID)</div>
+            <div style={{ fontSize: "1.2rem", wordBreak: "break-all" }}>{credential?.device || "N/A"}</div>
+          </div>
+          <div style={{ marginTop: "auto", fontSize: "0.9rem", color: "#64748b" }}>
+            กดลูกศรขวาเพื่อปิด
+          </div>
+        </div>
+      )}
       {currentMedia ? (
         <div className="player-stage">
           {outgoingMedia && (

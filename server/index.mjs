@@ -1141,10 +1141,11 @@ async function handler(req, res) {
             if (fallback && entity(fallback).org !== e.org)
               fail(403, "Playlist อยู่คนละองค์กร");
           }
+          if (b.branch) branchCheck(u, org, b.branch);
           const r = put(
             kind,
             e.org,
-            e.branch,
+            b.branch || e.branch,
             {
               ...e,
               name: str(b.name || e.name),

@@ -1566,12 +1566,24 @@ export default function Admin() {
                           className="btn-layout-delete"
                           disabled={busy}
                           onClick={() => {
+                            setDetail(d);
+                            setFormBranch(d.branch || "");
+                            setModal("editDisplay");
+                          }}
+                          style={{ marginLeft: "auto", background: "transparent", border: "none", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, paddingRight: 10 }}
+                        >
+                          <Edit2 size={16} /> แก้ไขข้อมูลจอ
+                        </button>
+                        <button
+                          className="btn-layout-delete"
+                          disabled={busy}
+                          onClick={() => {
                             if (confirm(`คุณต้องการลบจอ "${d.name}" ออกจากระบบอย่างถาวร ใช่หรือไม่?`)) {
                               act(`/displays/${d.id}/delete`);
                             }
                           }}
                           title="ลบจอนี้"
-                          style={{ marginLeft: "auto", background: "transparent", border: "none", color: "#e11d48", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500 }}
+                          style={{ background: "transparent", border: "none", color: "#e11d48", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500 }}
                         >
                           <Trash2 size={16} /> เลิกจับคู่ / ลบจอ
                         </button>
@@ -2651,6 +2663,30 @@ export default function Admin() {
                 </select>
               </label>
               {detail.role === "branch" && branchField()}
+              <button className="primary" disabled={busy}>
+                บันทึกการแก้ไข
+              </button>
+            </form>
+          )}
+          {modal === "editDisplay" && detail && (
+            <form onSubmit={submit((b) => api(`/displays/${detail.id}/edit`, b, org))}>
+              <label>
+                ชื่อจอ
+                <input name="name" required defaultValue={detail.name} />
+              </label>
+              {branchField()}
+              <button className="primary" disabled={busy}>
+                บันทึกการแก้ไข
+              </button>
+            </form>
+          )}
+          {modal === "editDisplay" && detail && (
+            <form onSubmit={submit((b) => api(`/displays/${detail.id}/edit`, b, org))}>
+              <label>
+                ชื่อจอ
+                <input name="name" required defaultValue={detail.name} />
+              </label>
+              {branchField()}
               <button className="primary" disabled={busy}>
                 บันทึกการแก้ไข
               </button>
