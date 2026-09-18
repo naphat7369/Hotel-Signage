@@ -1572,7 +1572,7 @@ export default function Admin() {
                           }}
                           style={{ marginLeft: "auto", background: "transparent", border: "none", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, paddingRight: 10 }}
                         >
-                          <Edit2 size={16} /> แก้ไขข้อมูลจอ
+                          <Edit3 size={16} /> แก้ไขข้อมูลจอ
                         </button>
                         <button
                           className="btn-layout-delete"
