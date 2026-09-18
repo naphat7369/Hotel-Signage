@@ -2366,6 +2366,7 @@ export default function Admin() {
                             style={{ background: "transparent", border: "none", cursor: "pointer", color: "#64748b" }}
                             onClick={() => {
                               setDetail(u);
+                              setFormBranch(u.branch || "");
                               setModal("editUser");
                             }}
                           >

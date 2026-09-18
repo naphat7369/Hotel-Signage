@@ -822,9 +822,12 @@ async function handler(req, res) {
         const b = await json(req);
         if (!["organization", "branch"].includes(b.role))
           fail(400, "สิทธิ์ไม่ถูกต้อง");
-        if (b.role === "branch") branchCheck(u, org, b.branch);
+        if (b.role === "branch") {
+          if (!b.branch) fail(400, "กรุณาระบุสาขา");
+          branchCheck(u, org, b.branch);
+        }
         
-        const existing = first("SELECT id FROM users WHERE id=? AND org=?", id, org);
+        const existing = one("SELECT id FROM users WHERE id=? AND org=?", id, org);
         if (!existing) fail(404, "ไม่พบผู้ใช้");
         
         if (b.password && b.password.length >= 12) {
@@ -854,7 +857,7 @@ async function handler(req, res) {
         admin(u);
         const id = path.split("/").pop();
         if (id === u.id) fail(400, "ไม่สามารถลบตัวเองได้");
-        const existing = first("SELECT id FROM users WHERE id=? AND org=?", id, org);
+        const existing = one("SELECT id FROM users WHERE id=? AND org=?", id, org);
         if (!existing) fail(404, "ไม่พบผู้ใช้");
         
         run("DELETE FROM users WHERE id=? AND org=?", id, org);
