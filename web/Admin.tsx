@@ -652,11 +652,11 @@ export default function Admin() {
       isDefault,
       hasActive,
       hasUpcoming,
-      hasExpired,
+      hasExpired: isDefault ? false : hasExpired,
       isUnscheduled,
       activeSchedule,
       upcomingSchedule,
-      expiredSchedule,
+      expiredSchedule: isDefault ? undefined : expiredSchedule,
       relatedCount: related.length,
     };
   };
@@ -2347,6 +2347,7 @@ export default function Admin() {
                     <th>อีเมล</th>
                     <th>สิทธิ์</th>
                     <th>สาขา</th>
+                    {user?.role !== "branch" && <th style={{ textAlign: "right" }}>จัดการ</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -2356,6 +2357,35 @@ export default function Admin() {
                       <td>{u.email}</td>
                       <td>{u.role}</td>
                       <td>{lookup(branches, u.branch) || "ทุกสาขา"}</td>
+                      {user?.role !== "branch" && (
+                        <td style={{ textAlign: "right", display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                          <button
+                            type="button"
+                            className="btn-icon"
+                            title="แก้ไข"
+                            style={{ background: "transparent", border: "none", cursor: "pointer", color: "#64748b" }}
+                            onClick={() => {
+                              setDetail(u);
+                              setModal("editUser");
+                            }}
+                          >
+                            <Edit3 size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-icon danger"
+                            title="ลบ"
+                            style={{ background: "transparent", border: "none", cursor: "pointer", color: "#e11d48" }}
+                            onClick={() => {
+                              if (confirm(`คุณต้องการลบผู้ใช้ ${u.name} ใช่หรือไม่?`)) {
+                                act(`/users/${u.id}`, undefined, "DELETE");
+                              }
+                            }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -2467,6 +2497,7 @@ export default function Admin() {
                 schedules: detail ? "แก้ไข Schedule (ตารางเวลา)" : "สร้าง Schedule ใหม่ (ตารางเวลา)",
                 branches: "เพิ่มสาขา",
                 users: "เพิ่มผู้ใช้งาน",
+                editUser: "แก้ไขผู้ใช้งาน",
                 organizations: "เพิ่มองค์กร",
                 editDisplay: "ตั้งค่าจอ",
                 schedulePreview: "จำลองการแสดงตามเวลา",
@@ -2588,6 +2619,39 @@ export default function Admin() {
               {branchField()}
               <button className="primary" disabled={busy}>
                 สร้างผู้ใช้
+              </button>
+            </form>
+          )}
+          {modal === "editUser" && detail && (
+            <form onSubmit={submit((b) => api(`/users/${detail.id}`, b, org, "PUT"))}>
+              <label>
+                ชื่อ
+                <input name="name" required defaultValue={detail.name} />
+              </label>
+              <label>
+                อีเมล (แก้ไขไม่ได้)
+                <input name="email" value={detail.email} disabled />
+              </label>
+              <label>
+                รหัสผ่านใหม่ <small>(เว้นว่างไว้หากไม่ต้องการเปลี่ยน)</small>
+                <input
+                  name="password"
+                  type="password"
+                  minLength={12}
+                  placeholder="********"
+                  autoComplete="new-password"
+                />
+              </label>
+              <label>
+                สิทธิ์
+                <select name="role" defaultValue={detail.role} onChange={(e) => setDetail({...detail, role: e.target.value})}>
+                  <option value="branch">ผู้ดูแลสาขา</option>
+                  <option value="organization">ผู้ดูแลองค์กร</option>
+                </select>
+              </label>
+              {detail.role === "branch" && branchField()}
+              <button className="primary" disabled={busy}>
+                บันทึกการแก้ไข
               </button>
             </form>
           )}

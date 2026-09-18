@@ -816,6 +816,51 @@ async function handler(req, res) {
         audit(u, "create-user", { id, org });
         return send(res, 201, { id });
       }
+      if (path.startsWith("/api/users/") && req.method === "PUT") {
+        admin(u);
+        const id = path.split("/").pop();
+        const b = await json(req);
+        if (!["organization", "branch"].includes(b.role))
+          fail(400, "สิทธิ์ไม่ถูกต้อง");
+        if (b.role === "branch") branchCheck(u, org, b.branch);
+        
+        const existing = first("SELECT id FROM users WHERE id=? AND org=?", id, org);
+        if (!existing) fail(404, "ไม่พบผู้ใช้");
+        
+        if (b.password && b.password.length >= 12) {
+          run(
+            "UPDATE users SET name=?, role=?, branch=?, password=? WHERE id=? AND org=?",
+            str(b.name),
+            b.role,
+            b.role === "branch" ? b.branch : "",
+            password(b.password),
+            id,
+            org
+          );
+        } else {
+          run(
+            "UPDATE users SET name=?, role=?, branch=? WHERE id=? AND org=?",
+            str(b.name),
+            b.role,
+            b.role === "branch" ? b.branch : "",
+            id,
+            org
+          );
+        }
+        audit(u, "update-user", { id, org });
+        return send(res, 200, { ok: true });
+      }
+      if (path.startsWith("/api/users/") && req.method === "DELETE") {
+        admin(u);
+        const id = path.split("/").pop();
+        if (id === u.id) fail(400, "ไม่สามารถลบตัวเองได้");
+        const existing = first("SELECT id FROM users WHERE id=? AND org=?", id, org);
+        if (!existing) fail(404, "ไม่พบผู้ใช้");
+        
+        run("DELETE FROM users WHERE id=? AND org=?", id, org);
+        audit(u, "delete-user", { id, org });
+        return send(res, 200, { ok: true });
+      }
       if (path === "/api/media" && req.method === "POST") {
         const branch = url.searchParams.get("branch");
         branchCheck(u, org, branch);
