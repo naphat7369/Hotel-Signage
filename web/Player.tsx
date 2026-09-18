@@ -71,8 +71,13 @@ export default function Player() {
       .catch((e) => setError("อ่านข้อมูล Player ไม่สำเร็จ: " + e.message));
     const t = setInterval(() => setClock(Date.now()), 1000);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft") setShowIdentify(true);
-      if (e.key === "ArrowRight" || e.key === "Escape") setShowIdentify(false);
+      const code = e.keyCode || e.which;
+      if (e.key === "ArrowLeft" || e.key === "Left" || code === 37 || code === 21) {
+        setShowIdentify(true);
+      }
+      if (e.key === "ArrowRight" || e.key === "Right" || e.key === "Escape" || code === 39 || code === 22 || code === 27 || code === 111) {
+        setShowIdentify(false);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => {
