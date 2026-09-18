@@ -829,7 +829,7 @@ async function handler(req, res) {
         
         if (b.password && b.password.length >= 12) {
           run(
-            "UPDATE users SET name=?, role=?, branch=?, password=? WHERE id=? AND org=?",
+            "UPDATE users SET name=?, role=?, branch=?, hash=? WHERE id=? AND org=?",
             str(b.name),
             b.role,
             b.role === "branch" ? b.branch : "",
