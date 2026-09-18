@@ -817,8 +817,8 @@ export default function Admin() {
       (pickerType === "image" && !isVid);
     return matchQuery && matchType;
   });
-  function act(path: string, b: Row = {}) {
-    work(() => api(path, b, org)).catch(() => {});
+  function act(path: string, b: Row | undefined = undefined, method?: string) {
+    work(() => api(path, b, org, method)).catch(() => {});
   }
   function branchField() {
     const selectedBranch = formBranch || branches[0]?.id || "";

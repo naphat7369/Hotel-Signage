@@ -1,18 +1,21 @@
-export async function api(path: string, body?: unknown, org?: string) {
+export async function api(path: string, body?: unknown, org?: string, method?: string) {
   const url =
     "/api" +
     path +
     (org ? (path.includes("?") ? "&" : "?") + "org=" + encodeURIComponent(org) : "");
-  const r = await fetch(
-    url,
-    body === undefined
-      ? { cache: "no-store" }
-      : {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        },
-  );
+  
+  const fetchMethod = method || (body === undefined ? "GET" : "POST");
+  const options: RequestInit = {
+    method: fetchMethod,
+    ...(fetchMethod === "GET" ? { cache: "no-store" } : {}),
+  };
+
+  if (body !== undefined) {
+    options.headers = { "Content-Type": "application/json" };
+    options.body = JSON.stringify(body);
+  }
+
+  const r = await fetch(url, options);
   let data: any;
   try {
     data = await r.json();
