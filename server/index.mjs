@@ -302,12 +302,14 @@ function manifest(d) {
       ],
     }));
   const b = entity(d.branch, "branches");
-  const fallbackId = d.fallback || b.fallback;
+  const fallbackId = d.fallback || (b ? b.fallback : null);
   const fallback = fallbackId ? entity(fallbackId, "versions") : null;
   return {
     device: d.id,
     name: d.name,
-    timezone: b.timezone,
+    branch: d.branch,
+    branchName: b ? b.name : "",
+    timezone: b ? b.timezone : "Asia/Bangkok",
     schedules,
     fallback,
     serverTime: now(),
@@ -1428,10 +1430,12 @@ async function handler(req, res) {
     if (path === "/Shotel-Player.apk" || path === "/StayScreen-Player.apk" || path.endsWith(".apk")) {
       const candidates = [
         file,
+        join(root, "Shotel-Player-Release.apk"),
+        join(root, "Shotel-Player.apk"),
         join(web, "Shotel-Player.apk"),
         join(web, "StayScreen-Player.apk"),
-        join(root, "Shotel-Player.apk"),
         join(root, "StayScreen-Player.apk"),
+        join(root, "android/app/build/outputs/apk/release/app-release.apk"),
         join(root, "android/app/build/outputs/apk/debug/app-debug.apk"),
       ];
       for (const cand of candidates) {

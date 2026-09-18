@@ -12,6 +12,7 @@ import org.json.*;
 import java.io.*;
 import java.net.*;
 import java.nio.file.*;
+import android.graphics.drawable.GradientDrawable;
 import java.security.*;
 import java.time.*;
 import java.util.*;
@@ -27,6 +28,173 @@ public class PlayerActivity extends Activity {
  private String base,key,currentVersion=""; private long offset=0,began=0,lastShot=0; private boolean resumed=false;
  private Bitmap imageBitmap; private Runnable advance, pendingVideo; private long lastVideoPosition=-1; private int stalled=0;
  private FileInputStream currentFis;
+ private FrameLayout identifyOverlay;
+ private TextView identifyName, identifyId, identifyBranch, identifyPlaylist, identifyServer;
+ private Runnable hideIdentifyRunnable;
+
+ private int dp(float v){return (int)(v*getResources().getDisplayMetrics().density+0.5f);}
+
+ @Override public boolean dispatchKeyEvent(KeyEvent event){
+  if(event.getAction()==KeyEvent.ACTION_DOWN){
+   int code=event.getKeyCode();
+   if(code==KeyEvent.KEYCODE_DPAD_LEFT||code==KeyEvent.KEYCODE_MENU||code==KeyEvent.KEYCODE_INFO||code==21||code==82||code==165){
+    toggleIdentify();
+    return true;
+   }
+   if(code==KeyEvent.KEYCODE_DPAD_RIGHT||code==KeyEvent.KEYCODE_BACK||code==KeyEvent.KEYCODE_ESCAPE||code==22||code==4||code==111){
+    if(identifyOverlay!=null&&identifyOverlay.getVisibility()==View.VISIBLE){
+     hideIdentify();
+     return true;
+    }
+   }
+  }
+  return super.dispatchKeyEvent(event);
+ }
+
+ private void toggleIdentify(){
+  if(identifyOverlay!=null&&identifyOverlay.getVisibility()==View.VISIBLE){
+   hideIdentify();
+  }else{
+   showIdentify();
+  }
+ }
+
+ private void hideIdentify(){
+  if(identifyOverlay!=null&&identifyOverlay.getVisibility()==View.VISIBLE){
+   identifyOverlay.animate().translationX(-dp(380)).alpha(0.5f).setDuration(200).withEndAction(()->{
+    if(identifyOverlay!=null)identifyOverlay.setVisibility(View.GONE);
+   }).start();
+  }
+  if(hideIdentifyRunnable!=null){
+   ui.removeCallbacks(hideIdentifyRunnable);
+   hideIdentifyRunnable=null;
+  }
+ }
+
+ private void showIdentify(){
+  if(frame==null)return;
+  if(identifyOverlay==null){
+   createIdentifyOverlay();
+  }
+  updateIdentifyContent();
+  identifyOverlay.setVisibility(View.VISIBLE);
+  identifyOverlay.setTranslationX(-dp(380));
+  identifyOverlay.setAlpha(1f);
+  identifyOverlay.animate().translationX(0f).alpha(1f).setDuration(250).start();
+
+  if(hideIdentifyRunnable!=null)ui.removeCallbacks(hideIdentifyRunnable);
+  hideIdentifyRunnable=this::hideIdentify;
+  ui.postDelayed(hideIdentifyRunnable,15000);
+ }
+
+ private void createIdentifyOverlay(){
+  identifyOverlay=new FrameLayout(this);
+  FrameLayout.LayoutParams flp=new FrameLayout.LayoutParams(dp(380),-1);
+  flp.gravity=Gravity.LEFT|Gravity.TOP;
+  identifyOverlay.setLayoutParams(flp);
+
+  GradientDrawable bg=new GradientDrawable();
+  bg.setColor(Color.argb(235, 15, 23, 42));
+  bg.setStroke(dp(2), Color.rgb(0, 137, 125));
+  identifyOverlay.setBackground(bg);
+
+  LinearLayout box=new LinearLayout(this);
+  box.setOrientation(LinearLayout.VERTICAL);
+  box.setPadding(dp(28),dp(32),dp(28),dp(32));
+
+  LinearLayout header=new LinearLayout(this);
+  header.setOrientation(LinearLayout.HORIZONTAL);
+  header.setGravity(Gravity.CENTER_VERTICAL);
+
+  TextView title=new TextView(this);
+  title.setText("ข้อมูลจอแสดงผล");
+  title.setTextSize(22);
+  title.setTypeface(null, Typeface.BOLD);
+  title.setTextColor(Color.rgb(0, 137, 125));
+  header.addView(title, new LinearLayout.LayoutParams(0,-2,1f));
+
+  TextView status=new TextView(this);
+  status.setText("● ออนไลน์");
+  status.setTextSize(13);
+  status.setTextColor(Color.rgb(52, 211, 153));
+  status.setPadding(dp(10),dp(4),dp(10),dp(4));
+  GradientDrawable sbg=new GradientDrawable();
+  sbg.setColor(Color.argb(50, 16, 185, 129));
+  sbg.setCornerRadius(dp(8));
+  status.setBackground(sbg);
+  header.addView(status);
+  box.addView(header);
+
+  View divider=new View(this);
+  divider.setBackgroundColor(Color.argb(100, 71, 85, 105));
+  LinearLayout.LayoutParams dlp=new LinearLayout.LayoutParams(-1,dp(1));
+  dlp.setMargins(0,dp(18),0,dp(18));
+  box.addView(divider, dlp);
+
+  identifyName=addIdentifySection(box, "ชื่อจอ (Display Name)", "-", 20, Color.WHITE, true);
+  identifyId=addIdentifySection(box, "รหัสอุปกรณ์ (Display ID)", "-", 15, Color.rgb(56, 189, 248), true);
+  identifyBranch=addIdentifySection(box, "สาขา (Branch)", "-", 16, Color.WHITE, false);
+  identifyPlaylist=addIdentifySection(box, "เพลย์ลิสต์ปัจจุบัน", "-", 15, Color.rgb(250, 204, 21), false);
+  identifyServer=addIdentifySection(box, "เซิร์ฟเวอร์ (Server)", "-", 13, Color.rgb(203, 213, 225), false);
+
+  View spacer=new View(this);
+  box.addView(spacer, new LinearLayout.LayoutParams(-1,0,1f));
+
+  TextView hint=new TextView(this);
+  hint.setText("กด [◀ ซ้าย] เพื่อซ่อน / ปิดอัตโนมัติใน 15 วินาที");
+  hint.setTextSize(12);
+  hint.setTextColor(Color.rgb(100, 116, 139));
+  hint.setGravity(Gravity.CENTER);
+  box.addView(hint, new LinearLayout.LayoutParams(-1,-2));
+
+  identifyOverlay.addView(box, new FrameLayout.LayoutParams(-1,-1));
+  frame.addView(identifyOverlay);
+ }
+
+ private TextView addIdentifySection(LinearLayout parent, String label, String defaultVal, int textSize, int color, boolean bold){
+  LinearLayout section=new LinearLayout(this);
+  section.setOrientation(LinearLayout.VERTICAL);
+  section.setPadding(0,0,0,dp(14));
+
+  TextView lbl=new TextView(this);
+  lbl.setText(label);
+  lbl.setTextSize(12);
+  lbl.setTextColor(Color.rgb(148, 163, 184));
+  section.addView(lbl);
+
+  TextView val=new TextView(this);
+  val.setText(defaultVal);
+  val.setTextSize(textSize);
+  if(bold)val.setTypeface(null, Typeface.BOLD);
+  val.setTextColor(color);
+  section.addView(val);
+
+  parent.addView(section);
+  return val;
+ }
+
+ private void updateIdentifyContent(){
+  String name="-", devId="-", branch="-", pl="-";
+  if(manifest!=null){
+   name=manifest.optString("name", "-");
+   devId=manifest.optString("device", "-");
+   branch=manifest.optString("branchName", manifest.optString("branch", "-"));
+  }
+  if((devId.equals("-")||devId.isEmpty())&&!key.isEmpty()){
+   devId=key.length()>8?key.substring(0,8):key;
+  }
+  if(program!=null){
+   pl=program.optString("name", currentVersion.isEmpty()?"-":currentVersion);
+  }else if(!currentVersion.isEmpty()){
+   pl=currentVersion;
+  }
+  if(identifyName!=null)identifyName.setText(name);
+  if(identifyId!=null)identifyId.setText(devId);
+  if(identifyBranch!=null)identifyBranch.setText(branch.isEmpty()?"-":branch);
+  if(identifyPlaylist!=null)identifyPlaylist.setText(pl);
+  if(identifyServer!=null)identifyServer.setText(base);
+ }
+
  @Override public void onCreate(Bundle state){super.onCreate(state);getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);getWindow().getDecorView().setSystemUiVisibility(5894);
   prefs=getSharedPreferences("player",MODE_PRIVATE);base=prefs.getString("server","");key=prefs.getString("token","");
   if(base.isEmpty()||key.isEmpty())setup();else startPlayer();
